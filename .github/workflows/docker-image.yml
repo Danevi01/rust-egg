@@ -13,8 +13,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Print Docker Username
+        run: echo "Docker Username: $DOCKER_USERNAME"
+
       - name: Log in to Docker Hub
-        run: echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USERNAME" --password-stdin
+        run: echo "${{ secrets.DOCKER_KEY }}" | docker login --username "$DOCKER_USERNAME" --password-stdin
 
       - name: Build and push Docker image
         env:
