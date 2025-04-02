@@ -21,8 +21,8 @@ jobs:
     
     - name: Build and push Docker image
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/rust-egg:latest .
-        docker push ${{ secrets.DOCKER_USERNAME }}/rust-egg:latest
+        docker build -t ${{ secrets.DOCKER_USERNAMENAME }}/rust-egg:latest .
+        docker push ${{ secrets.DOCKER_USERNAMENAME }}/rust-egg:latest
         
     - name: Log out from Docker Hub
       run: docker logout
