@@ -19,11 +19,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Debug Docker Login
-        run: echo "DOCKER_USERNAME=${DOCKER_USERNAME}, DOCKER_PASSWORD length=${#DOCKER_PASSWORD}"
-       env:
-       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
