@@ -20,10 +20,7 @@ jobs:
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      run: |
-        echo "DOCKER_USERNAME: $DOCKER_USERNAME"
-        echo "DOCKER_PASSWORD: $DOCKER_PASSWORD"
-        echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
+      run: echo $DOCKER_PASSWORD | docker login --username $DOCKER_USERNAME --password-stdin
 
     - name: Build and push Docker image
       run: |
