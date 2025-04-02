@@ -19,11 +19,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Login to Docker Hub
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        run: echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
+      - name: Debug Docker Login
+        run: echo "DOCKER_USERNAME=${DOCKER_USERNAME}, DOCKER_PASSWORD length=${#DOCKER_PASSWORD}"
+       env:
+       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
