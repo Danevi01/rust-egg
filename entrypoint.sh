@@ -36,9 +36,10 @@ elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
 # else Vanilla, do nothing
 fi
 
-# Fix for Rust not starting
+# Relink Steamclient
 ln -s ~/.steam/sdk64/steamclient.so ~/.steam/steamclient.so
 
+# Fix for Rust not starting
 export LD_LIBRARY_PATH=$(pwd)/RustDedicated_Data/Plugins/x86_64:$(pwd)
 
 # Run the Server
