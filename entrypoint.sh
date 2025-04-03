@@ -7,7 +7,7 @@ export INTERNAL_IP=`ip route get 1 | awk '{print $(NF-2);exit}'`
 
 ## if auto_update is not set or to 1 update
 if [ -z ${AUTO_UPDATE} ] || [ "${AUTO_UPDATE}" == "1" ]; then
-	./steamcmd/steamcmd.sh +force_install_dir /home/container +login anonymous +app_update 258550 -beta +quit
+	./steamcmd/steamcmd.sh +force_install_dir /home/container +login anonymous +app_update 258550 -beta ${BRANCH} +quit
 else
     echo -e "Not updating game server as auto update was set to 0. Starting Server"
 fi
@@ -37,6 +37,8 @@ elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
 fi
 
 # Fix for Rust not starting
+ln -s ~/.steam/sdk64/steamclient.so ~/.steam/steamclient.so
+
 export LD_LIBRARY_PATH=$(pwd)/RustDedicated_Data/Plugins/x86_64:$(pwd)
 
 # Run the Server
