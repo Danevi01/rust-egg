@@ -30,4 +30,4 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/rust-egg:latest
+          tags: ${{ secrets.DOCKER_USERNAMENAME }}/rust-egg:latest
