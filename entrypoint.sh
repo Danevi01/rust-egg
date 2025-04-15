@@ -17,14 +17,20 @@ MODIFIED_STARTUP=`eval echo $(echo ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g'
 echo ":/home/container$ ${MODIFIED_STARTUP}"
 
 if [[ "${FRAMEWORK}" == "carbon" ]]; then
-    # Carbon: https://github.com/CarbonCommunity/Carbon.Core
     echo "Updating Carbon..."
-    curl -sSL "https://github.com/CarbonCommunity/Carbon.Core/releases/download/production_build/Carbon.Linux.Release.tar.gz" | tar zx
+
+    if [[ "${BRANCH}" == "release" ]]; then
+        curl -sSL "https://github.com/CarbonCommunity/Carbon.Core/releases/download/production_build/Carbon.Linux.Release.tar.gz" | tar zx
+    else
+        curl -sSL "https://github.com/CarbonCommunity/Carbon/releases/download/preview_build/Carbon.Linux.Debug.tar.gz" | tar zx
+    fi
+
     echo "Done updating Carbon!"
 
     export DOORSTOP_ENABLED=1
     export DOORSTOP_TARGET_ASSEMBLY="$(pwd)/carbon/managed/Carbon.Preloader.dll"
     MODIFIED_STARTUP="LD_PRELOAD=$(pwd)/libdoorstop.so ${MODIFIED_STARTUP}"
+
 
 elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
     # Oxide: https://github.com/OxideMod/Oxide.Rust
