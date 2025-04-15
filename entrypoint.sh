@@ -40,7 +40,8 @@ fi
 ln -s ~/.steam/sdk64/steamclient.so ~/.steam/steamclient.so
 
 # Fix for Rust not starting
-export LD_LIBRARY_PATH=$(pwd)/RustDedicated_Data/Plugins/x86_64:$(pwd)
+export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/home/container/.steam/sdk64"
+export STEAMSDK_PATH="/home/container/.steam/sdk64"
 
 # Run the Server
 node /wrapper.js "${MODIFIED_STARTUP}"
