@@ -1,0 +1,17 @@
+name: Test GHCR_PAT
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-secret:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔍 Check if GHCR_PAT is set
+        run: |
+          if [ -z "${{ secrets.GHCR_PAT }}" ]; then
+            echo "❌ GHCR_PAT is EMPTY"
+            exit 1
+          else
+            echo "✅ GHCR_PAT is set"
+          fi
