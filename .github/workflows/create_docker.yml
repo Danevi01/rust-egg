@@ -4,21 +4,22 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
-  build-and-push:
-    name: Build and Push Docker Image
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Log in to Docker Hub
-      - run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+        uses: actions/checkout@v2
 
       - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Set up Docker Buildx (again - optional)
         uses: docker/setup-buildx-action@v2
 
       - name: Build and push Docker image
@@ -27,4 +28,4 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          tags: ${{ secrets.DOCKER_USERNAMENAME }}/rust-egg:latest
+          tags: ${{ secrets.DOCKER_USERNAME }}/rust-egg:latest
