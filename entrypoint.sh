@@ -57,6 +57,12 @@ fi
 
 echo "Rust server files updated successfully."
 
+# --- NEUE ZEILEN FÜR BERECHTIGUNGEN ---
+echo "Setting correct file permissions for /mnt/server..."
+chown -R container:container /mnt/server
+chmod -R u+rwX /mnt/server
+# -----------------------------------
+
 # --- Prepare the startup command for the Node.js wrapper ---
 # Pterodactyl automatically replaces {{VARIABLE}} placeholders in the Egg's startup string
 # with actual environment variables (e.g., $SERVER_PORT) before this script runs.
