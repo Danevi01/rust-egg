@@ -52,11 +52,20 @@ RUN mkdir -p /usr/local/bin/steamcmd-tool \
     && chown -R container:container /usr/local/bin/steamcmd-tool \
     && mkdir -p /home/container/steamapps \
     \
-    # NEUE ZEILEN FÜR ROBUSTERES STEAMCMD-SETUP BEIM BUILD:
-    # Initialisiere SteamCMD und lasse es sich selbst aktualisieren.
-    # Dies hilft, "Fatal Error: Download failed" und "ILocalize" Probleme zu vermeiden.
-    && /usr/local/bin/steamcmd-tool/steamcmd.sh +quit \
-    && /usr/local/bin/steamcmd-tool/steamcmd.sh +force_install_dir /usr/local/bin/steamcmd-tool +login anonymous +app_update 258550 +quit
+    # Robustes SteamCMD-Setup beim Build:
+    # Führe dies in einer Schleife aus, um temporäre Download-Fehler abzufangen.
+    # Versucht 5 Mal, mit 10 Sekunden Wartezeit dazwischen.
+    && RETRIES=5 && COUNT=0 && \
+    while [ $COUNT -lt $RETRIES ]; do \
+        echo "Attempting SteamCMD initialisation (Attempt $((COUNT + 1))/$RETRIES)..." && \
+        /usr/local/bin/steamcmd-tool/steamcmd.sh +quit && \
+        /usr/local/bin/steamcmd-tool/steamcmd.sh +force_install_dir /usr/local/bin/steamcmd-tool +login anonymous +app_update 258550 +quit && \
+        echo "SteamCMD initialisation successful." && break; \
+        COUNT=$((COUNT + 1)); \
+        echo "SteamCMD initialisation failed. Retrying in 10 seconds..."; \
+        sleep 10; \
+    done \
+    && if [ $COUNT -eq $RETRIES ]; then echo "SteamCMD initialisation failed after $RETRIES attempts." && exit 1; fi
 
 # Switch to the 'container' user. All subsequent RUN, CMD, or ENTRYPOINT commands will be run as this user.
 USER container
