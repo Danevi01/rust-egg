@@ -3,8 +3,9 @@ cd /home/container
 
 # Debugging-Netzwerkchecks
 echo "--- Netzwerk-Debugging-Start ---"
-ping -c 3 google.com || echo "Ping zu google.com fehlgeschlagen!"
-ping -c 3 steamcdn-a.akamaihd.net || echo "Ping zu steamcdn-a.akamaihd.net fehlgeschlagen!"
+# 'ping' ist im Container möglicherweise nicht installiert, die Curl-Tests sind aussagekräftiger.
+ping -c 3 google.com || echo "Ping zu google.com fehlgeschlagen! (ping-Befehl möglicherweise nicht verfügbar)"
+ping -c 3 steamcdn-a.akamaihd.net || echo "Ping zu steamcdn-a.akamaihd.net fehlgeschlagen! (ping-Befehl möglicherweise nicht verfügbar)"
 curl -v --max-time 15 https://steamcdn-a.akamaihd.net/ || echo "Curl zu steamcdn-a.akamaihd.net fehlgeschlagen!"
 echo "--- Netzwerk-Debugging-Ende ---"
 
