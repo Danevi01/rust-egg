@@ -34,19 +34,16 @@ RUN dpkg --add-architecture i386 \
     && apt update \
     && apt upgrade -y \
     && apt install -y lib32gcc-s1 lib32stdc++6 unzip curl iproute2 tzdata libgdiplus libsdl2-2.0-0:i386 \
-    && apt install -y locales xz-utils # Hinzugefügte Pakete für Robustheit und Locale-Support
-    \
+    && apt install -y locales xz-utils \
     && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
     && dpkg-reconfigure --frontend=noninteractive locales \
     && update-locale LANG=en_US.UTF-8 \
-    \
     && curl -sL https://deb.nodesource.com/setup_14.x | bash - \
     && apt install -y nodejs \
     && mkdir /node_modules \
     && npm install --prefix / ws \
     && useradd -d /home/container -m container \
-    \
-    && apt clean && rm -rf /var/lib/apt/lists/* # Cleanup, um Image-Größe zu reduzieren
+    && apt clean && rm -rf /var/lib/apt/lists/*
 
 # Install SteamCMD itself as root, and set ownership and execute permissions here.
 # This RUN instruction is performed by root (before the USER switch).
