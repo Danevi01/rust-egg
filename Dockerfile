@@ -12,8 +12,7 @@
 # copies or substantial portions of the Software.
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -28,8 +27,8 @@ LABEL org.opencontainers.image.licenses=MIT
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies, Node.js, and create the 'container' user
-# This RUN instruction must be completed as root to install system packages and create users.
+# Install system dependencies, Node.js, and create the 'container' user.
+# This RUN instruction must be completed as root.
 RUN dpkg --add-architecture i386 \
     && apt update \
     && apt upgrade -y \
@@ -40,24 +39,22 @@ RUN dpkg --add-architecture i386 \
     && npm install --prefix / ws \
     && useradd -d /home/container -m container
 
-# Install SteamCMD itself as root, but don't chown it yet.
+# Install SteamCMD itself as root, and set ownership here.
+# This RUN instruction is still performed by root (before the USER switch).
 RUN mkdir -p /usr/local/bin/steamcmd-tool \
     && cd /usr/local/bin/steamcmd-tool \
     && curl -sSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
     && tar -xzvf steamcmd.tar.gz \
     && rm steamcmd.tar.gz \
     && chmod +x steamcmd.sh \
+    && chown -R container:container /usr/local/bin/steamcmd-tool \
     && mkdir -p /home/container/steamapps # Still needed for game files
 
-# Switch to the 'container' user. All subsequent commands will be run as this user.
+# Switch to the 'container' user. All subsequent RUN, CMD, or ENTRYPOINT commands will be run as this user.
 USER container
 ENV USER=container HOME=/home/container
 
 WORKDIR /home/container
-
-# Now, as the 'container' user, perform the chown.
-# This ensures the user exists and has context.
-RUN chown -R container:container /usr/local/bin/steamcmd-tool
 
 # Copy entrypoint and wrapper scripts into the container
 COPY ./entrypoint.sh /entrypoint.sh
