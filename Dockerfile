@@ -50,7 +50,13 @@ RUN mkdir -p /usr/local/bin/steamcmd-tool \
     && chmod +x steamcmd.sh \
     && chmod -R +x . \
     && chown -R container:container /usr/local/bin/steamcmd-tool \
-    && mkdir -p /home/container/steamapps # Still needed for game files
+    && mkdir -p /home/container/steamapps \
+    \
+    # NEUE ZEILEN FÜR ROBUSTERES STEAMCMD-SETUP BEIM BUILD:
+    # Initialisiere SteamCMD und lasse es sich selbst aktualisieren.
+    # Dies hilft, "Fatal Error: Download failed" und "ILocalize" Probleme zu vermeiden.
+    && /usr/local/bin/steamcmd-tool/steamcmd.sh +quit \
+    && /usr/local/bin/steamcmd-tool/steamcmd.sh +force_install_dir /usr/local/bin/steamcmd-tool +login anonymous +app_update 258550 +quit
 
 # Switch to the 'container' user. All subsequent RUN, CMD, or ENTRYPOINT commands will be run as this user.
 USER container
