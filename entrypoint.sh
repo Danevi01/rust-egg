@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /home/container # <-- This remains important for the game data
+cd /home/container
 
 # Make internal Docker IP address available to processes.
 export INTERNAL_IP=`ip route get 1 | awk '{print $(NF-2);exit}'`
@@ -13,7 +13,7 @@ fi
 ## if auto_update is not set or to 1 update
 if [ -z ${AUTO_UPDATE} ] || [ "${AUTO_UPDATE}" == "1" ]; then
     echo "Starting SteamCMD update for branch: ${BRANCH}..."
-    # Ändere DIESE ZEILE: Absoluter Pfad zu steamcmd.sh
+    # WICHTIG: SteamCMD installiert das Spiel hier in /home/container als 'container' Benutzer.
 	/usr/local/bin/steamcmd-tool/steamcmd.sh +force_install_dir /home/container +login anonymous +app_update 258550 ${BRANCH_FLAG} validate +quit
     if [ $? -ne 0 ]; then
         echo "ERROR: SteamCMD update failed for branch ${BRANCH}!"
