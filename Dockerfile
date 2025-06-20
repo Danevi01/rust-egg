@@ -20,45 +20,31 @@
 # SOFTWARE.
 #
 
-FROM --platform=$TARGETOS/$TARGETARCH debian:bullseye-slim
+FROM 		--platform=$TARGETOS/$TARGETARCH debian:bullseye-slim
 
-LABEL author="Isaac A." maintainer="isaac@isaacs.site"
+LABEL       author="Isaac A." maintainer="isaac@isaacs.site"
 
-LABEL org.opencontainers.image.source="https://github.com/pterodactyl/yolks"
-LABEL org.opencontainers.image.licenses=MIT
+LABEL       org.opencontainers.image.source="https://github.com/pterodactyl/yolks"
+LABEL       org.opencontainers.image.licenses=MIT
 
-ENV DEBIAN_FRONTEND=noninteractive
+ENV         DEBIAN_FRONTEND=noninteractive
 
-RUN dpkg --add-architecture i386 \
-    && apt update \
-    && apt upgrade -y \
-    && apt install -y lib32gcc-s1 lib32stdc++6 unzip curl iproute2 tzdata libgdiplus libsdl2-2.0-0:i386 \
-    # --- Start SteamCMD Installation ---
-    && mkdir -p /home/container/steamcmd \
-    && curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - -C /home/container/steamcmd \
-    && chmod +x /home/container/steamcmd/steamcmd.sh \
-    # --- End SteamCMD Installation ---
-    \
-    # --- Fix for steamclient.so in system paths ---
-    # Create a symlink to steamclient.so in a system-wide library path and update dynamic linker cache.
-    # This helps ensure the library is found very early in the application's startup.
-    && mkdir -p /usr/lib64 \
-    && ln -s /home/container/.steam/sdk64/steamclient.so /usr/lib64/steamclient.so \
-    && ldconfig \
-    # --- End Fix for steamclient.so in system paths ---
-    \
-    && curl -sL https://deb.nodesource.com/setup_14.x | bash - \
-    && apt install -y nodejs \
-    && mkdir /node_modules \
-    && npm install --prefix / ws \
-    && useradd -d /home/container -m container
+RUN			dpkg --add-architecture i386 \
+			&& apt update \
+			&& apt upgrade -y \
+			&& apt install -y lib32gcc-s1 lib32stdc++6 unzip curl iproute2 tzdata libgdiplus libsdl2-2.0-0:i386 \
+			&& curl -sL https://deb.nodesource.com/setup_14.x | bash - \
+			&& apt install -y nodejs \
+			&& mkdir /node_modules \
+			&& npm install --prefix / ws \
+			&& useradd -d /home/container -m container
 
-USER container
-ENV USER=container HOME=/home/container
+USER 		container
+ENV  		USER=container HOME=/home/container
 
-WORKDIR /home/container
+WORKDIR 	/home/container
 
-COPY ./entrypoint.sh /entrypoint.sh
-COPY ./wrapper.js /wrapper.js
+COPY 		./entrypoint.sh /entrypoint.sh
+COPY 		./wrapper.js /wrapper.js
 
-CMD [ "/bin/bash", "/entrypoint.sh" ]
+CMD			[ "/bin/bash", "/entrypoint.sh" ]
