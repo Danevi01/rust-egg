@@ -23,6 +23,11 @@ if [ -z "${AUTO_UPDATE}" ] || [ "${AUTO_UPDATE}" == "1" ]; then
     if [ -n "$STEAMCLIENT_PATH" ]; then
         ln -sf "$STEAMCLIENT_PATH" "$HOME/.steam/sdk64/steamclient.so"
         echo "Linked steamclient.so from $STEAMCLIENT_PATH to $HOME/.steam/sdk64/steamclient.so"
+
+        # NEW: Copy the correct steamclient.so to Rust's plugin directory for early access.
+        # This addresses the "Tried to access Steam interface before Init succeeded" error.
+        cp "$HOME/.steam/sdk64/steamclient.so" "$HOME/RustDedicated_Data/Plugins/x86_64/steamclient.so"
+        echo "Copied steamclient.so to Rust's plugin directory for early access."
     else
         echo "WARNING: steamclient.so not found after SteamCMD update. This might cause issues."
     fi
@@ -58,6 +63,7 @@ if [[ "${FRAMEWORK}" == "carbon" ]]; then
     export DOORSTOP_ENABLED=1
     export DOORSTOP_TARGET_ASSEMBLY="$(pwd)/carbon/managed/Carbon.Preloader.dll"
     MODIFIED_STARTUP="LD_PRELOAD=$(pwd)/libdoorstop.so ${MODIFIED_STARTUP}"
+
 
 elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
     # Oxide: https://github.com/OxideMod/Oxide.Rust
