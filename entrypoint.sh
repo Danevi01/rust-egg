@@ -4,10 +4,36 @@ cd /home/container
 # Make internal Docker IP address available to processes.
 export INTERNAL_IP=`ip route get 1 | awk '{print $(NF-2);exit}'`
 
+# Ensure the .steam/sdk64 directory exists for steamclient.so
+mkdir -p "$HOME/.steam/sdk64"
 
 ## if auto_update is not set or to 1 update
 if [ -z ${AUTO_UPDATE} ] || [ "${AUTO_UPDATE}" == "1" ]; then
-	./steamcmd/steamcmd.sh +force_install_dir /home/container +login anonymous +app_update 258550 -beta ${BRANCH} +quit
+    echo "Starting SteamCMD update for Rust server..."
+    # Perform the SteamCMD update. The +quit is essential.
+    # We use /usr/games/steamcmd as per typical Debian installation,
+    # assuming it's correctly linked or in PATH after apt install.
+    # If steamcmd is in a specific folder like /home/container/steamcmd/steamcmd.sh, use that path instead.
+    /usr/games/steamcmd +force_install_dir "$HOME" +login anonymous +app_update 258550 -beta "${BRANCH}" +quit
+    echo "SteamCMD update complete."
+
+    # After update, ensure steamclient.so is linked correctly and LD_LIBRARY_PATH is set
+    # The find command will locate steamclient.so (often put in ~/.steam/sdk64 by SteamCMD itself
+    # or somewhere else within the installed game directory)
+    STEAMCLIENT_PATH=$(find "$HOME" -name "steamclient.so" -print -quit)
+    if [ -n "$STEAMCLIENT_PATH" ]; then
+        ln -sf "$STEAMCLIENT_PATH" "$HOME/.steam/sdk64/steamclient.so"
+        echo "Linked steamclient.so from $STEAMCLIENT_PATH to $HOME/.steam/sdk64/steamclient.so"
+    else
+        echo "WARNING: steamclient.so not found after SteamCMD update. This might cause issues."
+    fi
+
+    # Set LD_LIBRARY_PATH and STEAMSDK_PATH for the Rust server
+    export LD_LIBRARY_PATH="$HOME/.steam/sdk64:$LD_LIBRARY_PATH"
+    export STEAMSDK_PATH="$HOME/.steam/sdk64"
+    echo "LD_LIBRARY_PATH set to: $LD_LIBRARY_PATH"
+    echo "STEAMSDK_PATH set to: $STEAMSDK_PATH"
+
 else
     echo -e "Not updating game server as auto update was set to 0. Starting Server"
 fi
@@ -41,13 +67,6 @@ elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
     echo "Done updating uMod!"
 # else Vanilla, do nothing
 fi
-
-# Relink Steamclient
-ln -s ~/.steam/sdk64/steamclient.so ~/.steam/steamclient.so
-
-# Fix for Rust not starting
-export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:/home/container/.steam/sdk64"
-export STEAMSDK_PATH="/home/container/.steam/sdk64"
 
 # Run the Server
 node /wrapper.js "${MODIFIED_STARTUP}"
