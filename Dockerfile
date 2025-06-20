@@ -22,6 +22,10 @@
 
 FROM --platform=$TARGETOS/$TARGETARCH debian:bullseye-slim
 
+# NEUE ZEILE: Konfiguriere DNS-Server für den Container, um Auflösungsprobleme zu vermeiden
+RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf \
+    && echo "nameserver 8.8.4.4" >> /etc/resolv.conf
+
 LABEL author="Isaac A." maintainer="isaac@isaacs.site"
 LABEL org.opencontainers.image.source="https://github.com/pterodactyl/yolks"
 LABEL org.opencontainers.image.licenses=MIT
@@ -41,7 +45,7 @@ RUN dpkg --add-architecture i386 \
     && useradd -d /home/container -m container
 
 # Install SteamCMD itself as root, and set ownership and execute permissions here.
-# This RUN instruction is is performed by root (before the USER switch).
+# This RUN instruction is performed by root (before the USER switch).
 RUN mkdir -p /usr/local/bin/steamcmd-tool \
     && cd /usr/local/bin/steamcmd-tool \
     && curl -sSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
