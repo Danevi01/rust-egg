@@ -39,9 +39,8 @@ RUN dpkg --add-architecture i386 \
     && npm install --prefix / ws \
     && useradd -d /home/container -m container
 
-# --- DIESE ZEILE WIRD ENTFERNT, DA WIR /mnt/server NICHT MEHR NUTZEN ---
-# RUN mkdir -p /mnt/server
-# --------------------------------------------------------------------
+# Wir nutzen /home/container als primäres Verzeichnis, kein /mnt/server mehr
+# Daher ist kein explizites mkdir für /mnt/server hier nötig.
 
 USER container
 ENV USER=container HOME=/home/container
