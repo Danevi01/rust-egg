@@ -38,6 +38,15 @@ RUN dpkg --add-architecture i386 \
     && curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - -C /home/container/steamcmd \
     && chmod +x /home/container/steamcmd/steamcmd.sh \
     # --- End SteamCMD Installation ---
+    \
+    # --- Fix for steamclient.so in system paths ---
+    # Create a symlink to steamclient.so in a system-wide library path and update dynamic linker cache.
+    # This helps ensure the library is found very early in the application's startup.
+    && mkdir -p /usr/lib64 \
+    && ln -s /home/container/.steam/sdk64/steamclient.so /usr/lib64/steamclient.so \
+    && ldconfig \
+    # --- End Fix for steamclient.so in system paths ---
+    \
     && curl -sL https://deb.nodesource.com/setup_14.x | bash - \
     && apt install -y nodejs \
     && mkdir /node_modules \
