@@ -1,6 +1,13 @@
 #!/bin/bash
 cd /home/container
 
+# Debugging-Netzwerkchecks
+echo "--- Netzwerk-Debugging-Start ---"
+ping -c 3 google.com || echo "Ping zu google.com fehlgeschlagen!"
+ping -c 3 steamcdn-a.akamaihd.net || echo "Ping zu steamcdn-a.akamaihd.net fehlgeschlagen!"
+curl -v --max-time 15 https://steamcdn-a.akamaihd.net/ || echo "Curl zu steamcdn-a.akamaihd.net fehlgeschlagen!"
+echo "--- Netzwerk-Debugging-Ende ---"
+
 # Make internal Docker IP address available to processes.
 export INTERNAL_IP=`ip route get 1 | awk '{print $(NF-2);exit}'`
 
@@ -14,6 +21,7 @@ fi
 if [ -z ${AUTO_UPDATE} ] || [ "${AUTO_UPDATE}" == "1" ]; then
     echo "Starting SteamCMD update for branch: ${BRANCH}..."
     # WICHTIG: SteamCMD installiert das Spiel hier in /home/container als 'container' Benutzer.
+    # Dies ist der entscheidende Schritt für den Spieldownload!
 	/usr/local/bin/steamcmd-tool/steamcmd.sh +force_install_dir /home/container +login anonymous +app_update 258550 ${BRANCH_FLAG} validate +quit
     if [ $? -ne 0 ]; then
         echo "ERROR: SteamCMD update failed for branch ${BRANCH}!"
