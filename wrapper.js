@@ -38,12 +38,7 @@ var exec = require("child_process").exec;
 console.log("Starting Rust...");
 
 var exited = false;
-
-// --- GEÄNDERTE ZEILE HIER ---
-// Der entscheidende Teil: Übergib process.env an den exec-Aufruf
-const gameProcess = exec(startupCmd, { env: process.env });
-// --- ENDE GEÄNDERTE ZEILE ---
-
+const gameProcess = exec(startupCmd);
 gameProcess.stdout.on('data', filter);
 gameProcess.stderr.on('data', filter);
 gameProcess.on('exit', function (code, signal) {
@@ -51,7 +46,7 @@ gameProcess.on('exit', function (code, signal) {
 
 	if (code) {
 		console.log("Main game process exited with code " + code);
-		// process.exit(code); // Diese Zeile ist normalerweise auskommentiert, da Pterodactyl den Container steuert.
+		// process.exit(code);
 	}
 });
 
