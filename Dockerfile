@@ -59,7 +59,8 @@ RUN mkdir -p /usr/local/bin/steamcmd-tool \
     while [ $COUNT -lt $RETRIES ]; do \
         echo "Attempting SteamCMD initialisation (Attempt $((COUNT + 1))/$RETRIES)..." && \
         /usr/local/bin/steamcmd-tool/steamcmd.sh +quit && \
-        /usr/local/bin/steamcmd-tool/steamcmd.sh +force_install_dir /usr/local/bin/steamcmd-tool +login anonymous +app_update 258550 +quit && \
+        # WICHTIGE ÄNDERUNG: Installiere Rust nach /home/container
+        /usr/local/bin/steamcmd-tool/steamcmd.sh +force_install_dir /home/container +login anonymous +app_update 258550 +quit && \
         echo "SteamCMD initialisation successful." && break; \
         COUNT=$((COUNT + 1)); \
         echo "SteamCMD initialisation failed. Retrying in 10 seconds..."; \
