@@ -24,9 +24,9 @@ if [ -z "${AUTO_UPDATE}" ] || [ "${AUTO_UPDATE}" == "1" ]; then
         ln -sf "$STEAMCLIENT_PATH" "$HOME/.steam/sdk64/steamclient.so"
         echo "Linked steamclient.so from $STEAMCLIENT_PATH to $HOME/.steam/sdk64/steamclient.so"
 
-        # NEW ROBUST COPY: Copy the correct steamclient.so to Rust's plugin directory for early access.
+        # Copy the correct steamclient.so to Rust's plugin directory for early access.
         # Use 'cp -L' to dereference the symlink and copy the actual file.
-        # If that fails, try a direct copy as a fallback.
+        # The 'cp: ... are the same file' warning is expected if SteamCMD already handled this.
         cp -L "$HOME/.steam/sdk64/steamclient.so" "$HOME/RustDedicated_Data/Plugins/x86_64/steamclient.so" || {
           echo "WARNING: Failed to copy steamclient.so using cp -L. Attempting a direct copy (might fail if symlink is broken)."
           cp "$HOME/.steam/sdk64/steamclient.so" "$HOME/RustDedicated_Data/Plugins/x86_64/steamclient.so"
@@ -79,5 +79,27 @@ elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
 # else Vanilla, do nothing
 fi
 
-# Run the Server
+# --- NEUER VERSUCH: RustDedicated direkt mit LD_PRELOAD starten ---
+# Dies ist ein Versuch, die steamclient.so so früh wie möglich für Rust zu laden.
+# Wir versuchen, das RustDedicated-Executable direkt zu identifizieren und zu starten.
+echo "Attempting to launch RustDedicated with LD_PRELOAD..."
+
+# Annahme: Der erste Teil von MODIFIED_STARTUP ist das RustDedicated-Executable
+# und der Rest sind Argumente. Dies muss genau zu deinem STARTUP-Befehl passen.
+RUST_EXECUTABLE=$(echo "${MODIFIED_STARTUP}" | awk '{print $1}')
+RUST_ARGS=$(echo "${MODIFIED_STARTUP}" | cut -d' ' -f2-)
+
+# Überprüfe, ob das Executable existiert und ausführbar ist
+if [ -x "${RUST_EXECUTABLE}" ]; then
+    echo "Executing: LD_PRELOAD=\"$HOME/.steam/sdk64/steamclient.so\" \"${RUST_EXECUTABLE}\" ${RUST_ARGS}"
+    # Führe den Rust-Server direkt aus. Wenn er läuft, wird dieser Prozess den Container beenden.
+    LD_PRELOAD="$HOME/.steam/sdk64/steamclient.so" "${RUST_EXECUTABLE}" ${RUST_ARGS}
+    EXIT_CODE=$?
+    echo "Direct LD_PRELOAD launch exited with code ${EXIT_CODE}. Falling back to node /wrapper.js..."
+else
+    echo "RustDedicated executable not found or not executable at ${RUST_EXECUTABLE}. Falling back to node /wrapper.js..."
+fi
+
+# Fallback: Wenn der direkte LD_PRELOAD-Start nicht funktioniert hat oder das Executable nicht gefunden wurde,
+# starten wir den Server über den Node.js-Wrapper, wie zuvor.
 node /wrapper.js "${MODIFIED_STARTUP}"
