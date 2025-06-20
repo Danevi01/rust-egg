@@ -4,12 +4,12 @@
 # Rust App ID
 SRCDS_APPID=258550
 
-# Set SteamCMD home directory to avoid issues
-export HOME=/mnt/server
+# Set SteamCMD home directory to avoid issues.
+# This ensures SteamCMD writes its files (like SteamApps cache) correctly.
+export HOME="/home/container"
 
 # Ensure SteamCMD is executable and in the correct place
-# This assumes SteamCMD was installed by the egg's installation script
-STEAMCMD_PATH="/mnt/server/steamcmd/steamcmd.sh"
+STEAMCMD_PATH="/home/container/steamcmd/steamcmd.sh"
 
 if [ ! -f "${STEAMCMD_PATH}" ]; then
     echo "ERROR: SteamCMD executable not found at ${STEAMCMD_PATH}!"
@@ -32,11 +32,15 @@ STEAM_PASS=${STEAM_PASS:-""}
 STEAM_AUTH=${STEAM_AUTH:-""}
 
 echo "Updating Rust server files for branch '${BRANCH}' (AppID: ${SRCDS_APPID})..."
-cd /mnt/server/steamcmd || exit 1 # Change to steamcmd directory
+
+# Change to SteamCMD directory to run steamcmd.sh
+# Ensure we are running from the directory where steamcmd.sh is located
+cd /home/container/steamcmd || { echo "ERROR: Cannot change to SteamCMD directory. Exiting."; exit 1; }
 
 # Run SteamCMD update
 # Use +quit to ensure steamcmd exits after update
 # The 'validate' flag ensures file integrity and can fix corrupted files
+# Force install dir to /mnt/server, as this is where Rust game files should be.
 ./steamcmd.sh +force_install_dir /mnt/server +login "${STEAM_USER}" "${STEAM_PASS}" "${STEAM_AUTH}" +app_update "${SRCDS_APPID}" ${BRANCH_FLAG} validate +quit
 
 # Check if SteamCMD update was successful
@@ -48,32 +52,32 @@ fi
 echo "Rust server files updated successfully."
 
 # --- Prepare startup command for the Node.js wrapper ---
-# Build the exact startup command string that the wrapper expects
-# This should match your egg's 'startup' field, but without the initial '.\/RustDedicated'
-# as the wrapper likely handles execution.
+# Build the exact startup command string that the wrapper expects.
+# Pterodactyl replaces {{VARIABLE}} placeholders with actual environment variables
+# before the entrypoint.sh runs. So, we use $VARIABLE here.
 
 MODIFIED_STARTUP="./RustDedicated -batchmode"
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.port {{SERVER_PORT}}"
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.queryport {{QUERY_PORT}}"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.port ${SERVER_PORT}"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.queryport ${QUERY_PORT}"
 MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.identity \"rust\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +rcon.port {{RCON_PORT}}"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +rcon.port ${RCON_PORT}"
 MODIFIED_STARTUP="${MODIFIED_STARTUP} +rcon.web true"
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.hostname \"{{HOSTNAME}}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.level \"{{LEVEL}}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.description \"{{DESCRIPTION}}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.url \"{{SERVER_URL}}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.headerimage \"{{SERVER_IMG}}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.logoimage \"{{SERVER_LOGO}}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.maxplayers {{MAX_PLAYERS}}"
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +rcon.password \"{{RCON_PASS}}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.saveinterval {{SAVEINTERVAL}}"
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +app.port {{APP_PORT}}"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.hostname \"${HOSTNAME}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.level \"${LEVEL}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.description \"${DESCRIPTION}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.url \"${SERVER_URL}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.headerimage \"${SERVER_IMG}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.logoimage \"${SERVER_LOGO}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.maxplayers ${MAX_PLAYERS}"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +rcon.password \"${RCON_PASS}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.saveinterval ${SAVEINTERVAL}"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +app.port ${APP_PORT}"
 
-# Add map URL or world size/seed logic as in your original egg's startup string
+# Add map URL or world size/seed logic
 if [ -z "${MAP_URL}" ]; then
-    MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.worldsize \"{{WORLD_SIZE}}\" +server.seed \"{{WORLD_SEED}}\""
+    MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.worldsize \"${WORLD_SIZE}\" +server.seed \"${WORLD_SEED}\""
 else
-    MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.levelurl {{MAP_URL}}"
+    MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.levelurl ${MAP_URL}"
 fi
 
 # Add additional arguments
@@ -81,17 +85,16 @@ if [ -n "${ADDITIONAL_ARGS}" ]; then
     MODIFIED_STARTUP="${MODIFIED_STARTUP} ${ADDITIONAL_ARGS}"
 fi
 
-# IMPORTANT: Replace Pterodactyl's template variables with actual environment variables
-# Pterodactyl replaces these placeholders BEFORE the entrypoint.sh is executed.
-# The `startup` string in your egg should already do this,
-# so the actual values will be substituted when the entrypoint runs.
-# However, if your wrapper expects the raw template (e.g., {{SERVER_PORT}}), you might need to adjust.
-# Assuming the Pterodactyl daemon already replaced them, we pass the built string.
-
-# Ensure we are in the server directory before executing the wrapper
-cd /mnt/server || exit 1
+# Ensure we are in the server directory (/mnt/server) before executing the wrapper.
+# The RustDedicated executable should be in /mnt/server.
+# The Node.js wrapper itself might be in /home/container or / (depending on your Dockerfile).
+# It's safest to cd into /mnt/server before running the wrapper,
+# assuming the wrapper then executes RustDedicated relative to that path.
+cd /mnt/server || { echo "ERROR: Cannot change to server game directory. Exiting."; exit 1; }
 
 echo "Starting server via Node.js wrapper: node /wrapper.js \"${MODIFIED_STARTUP}\""
 
-# Run the Node.js wrapper with the generated startup command
-node /wrapper.js "${MODIFIED_STARTUP}"
+# Run the Node.js wrapper with the generated startup command.
+# Ensure 'node' executable is in the PATH within your Docker image.
+# Ensure '/wrapper.js' is the correct path to your wrapper script in the container.
+exec node /wrapper.js "${MODIFIED_STARTUP}"
