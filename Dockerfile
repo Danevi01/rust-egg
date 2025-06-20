@@ -12,7 +12,8 @@
 # copies or substantial portions of the Software.
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -39,7 +40,7 @@ RUN dpkg --add-architecture i386 \
     && npm install --prefix / ws \
     && useradd -d /home/container -m container
 
-# Install SteamCMD itself as root, and set ownership here.
+# Install SteamCMD itself as root, and set ownership and execute permissions here.
 # This RUN instruction is still performed by root (before the USER switch).
 RUN mkdir -p /usr/local/bin/steamcmd-tool \
     && cd /usr/local/bin/steamcmd-tool \
@@ -47,6 +48,7 @@ RUN mkdir -p /usr/local/bin/steamcmd-tool \
     && tar -xzvf steamcmd.tar.gz \
     && rm steamcmd.tar.gz \
     && chmod +x steamcmd.sh \
+    && chmod -R +x . \
     && chown -R container:container /usr/local/bin/steamcmd-tool \
     && mkdir -p /home/container/steamapps # Still needed for game files
 
