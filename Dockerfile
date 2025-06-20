@@ -12,7 +12,8 @@
 # copies or substantial portions of the Software.
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -20,9 +21,6 @@
 #
 
 FROM --platform=$TARGETOS/$TARGETARCH debian:bullseye-slim
-
-# ENTFERNT: Die problematischen Zeilen zur Bearbeitung von /etc/resolv.conf und resolvconf-Installation
-# Diese Konfiguration sollte vom Docker Daemon oder Pterodactyl erfolgen.
 
 LABEL author="Isaac A." maintainer="isaac@isaacs.site"
 LABEL org.opencontainers.image.source="https://github.com/pterodactyl/yolks"
@@ -36,11 +34,19 @@ RUN dpkg --add-architecture i386 \
     && apt update \
     && apt upgrade -y \
     && apt install -y lib32gcc-s1 lib32stdc++6 unzip curl iproute2 tzdata libgdiplus libsdl2-2.0-0:i386 \
+    && apt install -y locales xz-utils # Hinzugefügte Pakete für Robustheit und Locale-Support
+    \
+    && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
+    && dpkg-reconfigure --frontend=noninteractive locales \
+    && update-locale LANG=en_US.UTF-8 \
+    \
     && curl -sL https://deb.nodesource.com/setup_14.x | bash - \
     && apt install -y nodejs \
     && mkdir /node_modules \
     && npm install --prefix / ws \
-    && useradd -d /home/container -m container
+    && useradd -d /home/container -m container \
+    \
+    && apt clean && rm -rf /var/lib/apt/lists/* # Cleanup, um Image-Größe zu reduzieren
 
 # Install SteamCMD itself as root, and set ownership and execute permissions here.
 # This RUN instruction is performed by root (before the USER switch).
