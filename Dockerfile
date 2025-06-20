@@ -2,7 +2,7 @@
 # Copyright (c) 2021 Pterodactyl
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
+# of this software and associated associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
@@ -20,31 +20,30 @@
 # SOFTWARE.
 #
 
-FROM 		--platform=$TARGETOS/$TARGETARCH debian:bullseye-slim
+FROM --platform=$TARGETOS/$TARGETARCH debian:bullseye-slim
 
-LABEL       author="Isaac A." maintainer="isaac@isaacs.site"
+LABEL author="Isaac A." maintainer="isaac@isaacs.site"
+LABEL org.opencontainers.image.source="https://github.com/pterodactyl/yolks"
+LABEL org.opencontainers.image.licenses=MIT
 
-LABEL       org.opencontainers.image.source="https://github.com/pterodactyl/yolks"
-LABEL       org.opencontainers.image.licenses=MIT
+ENV DEBIAN_FRONTEND=noninteractive
 
-ENV         DEBIAN_FRONTEND=noninteractive
+RUN dpkg --add-architecture i386 \
+    && apt update \
+    && apt upgrade -y \
+    && apt install -y lib32gcc-s1 lib32stdc++6 unzip curl iproute2 tzdata libgdiplus libsdl2-2.0-0:i386 \
+    && curl -sL https://deb.nodesource.com/setup_14.x | bash - \
+    && apt install -y nodejs \
+    && mkdir /node_modules \
+    && npm install --prefix / ws \
+    && useradd -d /home/container -m container
 
-RUN			dpkg --add-architecture i386 \
-			&& apt update \
-			&& apt upgrade -y \
-			&& apt install -y lib32gcc-s1 lib32stdc++6 unzip curl iproute2 tzdata libgdiplus libsdl2-2.0-0:i386 \
-			&& curl -sL https://deb.nodesource.com/setup_14.x | bash - \
-			&& apt install -y nodejs \
-			&& mkdir /node_modules \
-			&& npm install --prefix / ws \
-			&& useradd -d /home/container -m container
+USER container
+ENV USER=container HOME=/home/container
 
-USER 		container
-ENV  		USER=container HOME=/home/container
+WORKDIR /home/container
 
-WORKDIR 	/home/container
-
-# --- NEUE HINZUFÜGUNG: SteamCMD direkt in Dockerfile installieren ---
+# Install SteamCMD directly into the Docker image
 RUN mkdir -p /home/container/steamcmd \
     && cd /home/container/steamcmd \
     && curl -sSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
@@ -52,8 +51,7 @@ RUN mkdir -p /home/container/steamcmd \
     && rm steamcmd.tar.gz \
     && mkdir -p /home/container/steamapps # Fix steamcmd disk write error
 
-# --- Kopieren von Entrypoint und Wrapper (wie gehabt) ---
-COPY 		./entrypoint.sh /entrypoint.sh
-COPY 		./wrapper.js /wrapper.js
+COPY ./entrypoint.sh /entrypoint.sh
+COPY ./wrapper.js /wrapper.js
 
-CMD			[ "/bin/bash", "/entrypoint.sh" ]
+CMD [ "/bin/bash", "/entrypoint.sh" ]
