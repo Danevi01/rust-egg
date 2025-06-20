@@ -12,10 +12,10 @@
 # copies or substantial portions of the Software.
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR TORT OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 #
@@ -39,9 +39,9 @@ RUN dpkg --add-architecture i386 \
     && npm install --prefix / ws \
     && useradd -d /home/container -m container
 
-# Stelle sicher, dass das /mnt/server Verzeichnis existiert,
-# bevor Pterodactyl das persistente Volume dort einhängt.
-RUN mkdir -p /mnt/server
+# --- DIESE ZEILE WIRD ENTFERNT, DA WIR /mnt/server NICHT MEHR NUTZEN ---
+# RUN mkdir -p /mnt/server
+# --------------------------------------------------------------------
 
 USER container
 ENV USER=container HOME=/home/container
