@@ -22,12 +22,12 @@
 
 FROM 		--platform=$TARGETOS/$TARGETARCH debian:bullseye-slim
 
-LABEL       author="Isaac A." maintainer="isaac@isaacs.site"
+LABEL       author="Isaac A." maintainer="isaac@isaacs.site"
 
-LABEL       org.opencontainers.image.source="https://github.com/pterodactyl/yolks"
-LABEL       org.opencontainers.image.licenses=MIT
+LABEL       org.opencontainers.image.source="https://github.com/pterodactyl/yolks"
+LABEL       org.opencontainers.image.licenses=MIT
 
-ENV         DEBIAN_FRONTEND=noninteractive
+ENV         DEBIAN_FRONTEND=noninteractive
 
 RUN			dpkg --add-architecture i386 \
 			&& apt update \
@@ -40,10 +40,19 @@ RUN			dpkg --add-architecture i386 \
 			&& useradd -d /home/container -m container
 
 USER 		container
-ENV  		USER=container HOME=/home/container
+ENV  		USER=container HOME=/home/container
 
 WORKDIR 	/home/container
 
+# --- NEUE HINZUFÜGUNG: SteamCMD direkt in Dockerfile installieren ---
+RUN mkdir -p /home/container/steamcmd \
+    && cd /home/container/steamcmd \
+    && curl -sSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
+    && tar -xzvf steamcmd.tar.gz \
+    && rm steamcmd.tar.gz \
+    && mkdir -p /home/container/steamapps # Fix steamcmd disk write error
+
+# --- Kopieren von Entrypoint und Wrapper (wie gehabt) ---
 COPY 		./entrypoint.sh /entrypoint.sh
 COPY 		./wrapper.js /wrapper.js
 
