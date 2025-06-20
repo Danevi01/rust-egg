@@ -22,12 +22,12 @@
 
 FROM 		--platform=$TARGETOS/$TARGETARCH debian:bullseye-slim
 
-LABEL       author="Isaac A." maintainer="isaac@isaacs.site"
+LABEL       author="Isaac A." maintainer="isaac@isaacs.site"
 
-LABEL       org.opencontainers.image.source="https://github.com/pterodactyl/yolks"
-LABEL       org.opencontainers.image.licenses=MIT
+LABEL       org.opencontainers.image.source="https://github.com/pterodactyl/yolks"
+LABEL       org.opencontainers.image.licenses=MIT
 
-ENV         DEBIAN_FRONTEND=noninteractive
+ENV         DEBIAN_FRONTEND=noninteractive
 
 RUN			dpkg --add-architecture i386 \
 			&& apt update \
@@ -39,8 +39,12 @@ RUN			dpkg --add-architecture i386 \
 			&& npm install --prefix / ws \
 			&& useradd -d /home/container -m container
 
+# --- FÜGE DIESE ZEILE HINZU ---
+RUN mkdir -p /mnt/server
+# -----------------------------
+
 USER 		container
-ENV  		USER=container HOME=/home/container
+ENV  		USER=container HOME=/home/container
 
 WORKDIR 	/home/container
 
