@@ -44,15 +44,16 @@ ENV USER=container HOME=/home/container
 
 WORKDIR /home/container
 
-# Install SteamCMD directly into the Docker image
-RUN mkdir -p /home/container/steamcmd \
-    && cd /home/container/steamcmd \
+# Install SteamCMD directly into the Docker image at a different, non-mounted path
+# This helps rule out issues with the /home/container mount point hiding built-in files
+RUN mkdir -p /usr/local/bin/steamcmd-tool \
+    && cd /usr/local/bin/steamcmd-tool \
     && curl -sSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
     && tar -xzvf steamcmd.tar.gz \
     && rm steamcmd.tar.gz \
     && chmod +x steamcmd.sh \
-    && mkdir -p /home/container/steamapps \
-    && chown -R container:container /home/container/steamcmd
+    && chown -R container:container /usr/local/bin/steamcmd-tool \
+    && mkdir -p /home/container/steamapps # Still needed for game files
 
 # Copy entrypoint and wrapper scripts into the container
 COPY ./entrypoint.sh /entrypoint.sh
