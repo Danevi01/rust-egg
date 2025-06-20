@@ -41,7 +41,7 @@ RUN dpkg --add-architecture i386 \
     && useradd -d /home/container -m container
 
 # Install SteamCMD itself as root, and set ownership and execute permissions here.
-# This RUN instruction is still performed by root (before the USER switch).
+# This RUN instruction is is performed by root (before the USER switch).
 RUN mkdir -p /usr/local/bin/steamcmd-tool \
     && cd /usr/local/bin/steamcmd-tool \
     && curl -sSL -o steamcmd.tar.gz https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
@@ -53,20 +53,18 @@ RUN mkdir -p /usr/local/bin/steamcmd-tool \
     && mkdir -p /home/container/steamapps \
     \
     # Robustes SteamCMD-Setup beim Build:
-    # Führe dies in einer Schleife aus, um temporäre Download-Fehler abzufangen.
-    # Versucht 5 Mal, mit 10 Sekunden Wartezeit dazwischen.
+    # Nur SteamCMD selbst initialisieren (+quit), NICHT das Spiel herunterladen.
+    # Das Spiel wird später von entrypoint.sh im /home/container Verzeichnis installiert.
     && RETRIES=5 && COUNT=0 && \
     while [ $COUNT -lt $RETRIES ]; do \
-        echo "Attempting SteamCMD initialisation (Attempt $((COUNT + 1))/$RETRIES)..." && \
+        echo "Attempting SteamCMD self-initialisation (Attempt $((COUNT + 1))/$RETRIES)..." && \
         /usr/local/bin/steamcmd-tool/steamcmd.sh +quit && \
-        # WICHTIGE ÄNDERUNG: Installiere Rust nach /home/container
-        /usr/local/bin/steamcmd-tool/steamcmd.sh +force_install_dir /home/container +login anonymous +app_update 258550 +quit && \
-        echo "SteamCMD initialisation successful." && break; \
+        echo "SteamCMD self-initialisation successful." && break; \
         COUNT=$((COUNT + 1)); \
-        echo "SteamCMD initialisation failed. Retrying in 10 seconds..."; \
+        echo "SteamCMD self-initialisation failed. Retrying in 10 seconds..."; \
         sleep 10; \
     done \
-    && if [ $COUNT -eq $RETRIES ]; then echo "SteamCMD initialisation failed after $RETRIES attempts." && exit 1; fi
+    && if [ $COUNT -eq $RETRIES ]; then echo "SteamCMD self-initialisation failed after $RETRIES attempts." && exit 1; fi
 
 # Switch to the 'container' user. All subsequent RUN, CMD, or ENTRYPOINT commands will be run as this user.
 USER container
