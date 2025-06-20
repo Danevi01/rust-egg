@@ -1,65 +1,97 @@
 #!/bin/bash
-cd /home/container
+# entrypoint.sh for Rust Server with Node.js Wrapper
 
-# Debugging-Netzwerkchecks
-echo "--- Netzwerk-Debugging-Start ---"
-# 'ping' ist im Container möglicherweise nicht installiert, die Curl-Tests sind aussagekräftiger.
-ping -c 3 google.com || echo "Ping zu google.com fehlgeschlagen! (ping-Befehl möglicherweise nicht verfügbar)"
-ping -c 3 steamcdn-a.akamaihd.net || echo "Ping zu steamcdn-a.akamaihd.net fehlgeschlagen! (ping-Befehl möglicherweise nicht verfügbar)"
-curl -v --max-time 15 https://steamcdn-a.akamaihd.net/ || echo "Curl zu steamcdn-a.akamaihd.net fehlgeschlagen!"
-echo "--- Netzwerk-Debugging-Ende ---"
+# Rust App ID
+SRCDS_APPID=258550
 
-# Make internal Docker IP address available to processes.
-export INTERNAL_IP=`ip route get 1 | awk '{print $(NF-2);exit}'`
+# Set SteamCMD home directory to avoid issues
+export HOME=/mnt/server
 
-## Add branch logic based on the BRANCH environment variable
+# Ensure SteamCMD is executable and in the correct place
+# This assumes SteamCMD was installed by the egg's installation script
+STEAMCMD_PATH="/mnt/server/steamcmd/steamcmd.sh"
+
+if [ ! -f "${STEAMCMD_PATH}" ]; then
+    echo "ERROR: SteamCMD executable not found at ${STEAMCMD_PATH}!"
+    echo "Please ensure your Pterodactyl Egg's installation script correctly installs SteamCMD."
+    exit 1
+fi
+
+# Dynamically set the SteamCMD branch flag based on the Pterodactyl 'BRANCH' variable
 BRANCH_FLAG=""
-if [ "${BRANCH}" != "release" ]; then
+if [ -n "${BRANCH}" ] && [ "${BRANCH}" != "release" ]; then
+    echo "Selected Rust Branch: ${BRANCH}"
     BRANCH_FLAG="-beta ${BRANCH}"
-fi
-
-## if auto_update is not set or to 1 update
-if [ -z ${AUTO_UPDATE} ] || [ "${AUTO_UPDATE}" == "1" ]; then
-    echo "Starting SteamCMD update for branch: ${BRANCH}..."
-    # WICHTIG: SteamCMD installiert das Spiel hier in /home/container als 'container' Benutzer.
-    # Dies ist der entscheidende Schritt für den Spieldownload!
-	/usr/local/bin/steamcmd-tool/steamcmd.sh +force_install_dir /home/container +login anonymous +app_update 258550 ${BRANCH_FLAG} validate +quit
-    if [ $? -ne 0 ]; then
-        echo "ERROR: SteamCMD update failed for branch ${BRANCH}!"
-        exit 1
-    fi
-    echo "SteamCMD update finished for branch: ${BRANCH}."
 else
-    echo -e "Not updating game server as auto update was set to 0. Starting Server"
+    echo "Selected Rust Branch: release (default)"
 fi
 
-# Replace Startup Variables
-MODIFIED_STARTUP=`eval echo $(echo ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')`
-echo ":/home/container$ ${MODIFIED_STARTUP}"
+# SteamCMD login - use anonymous if STEAM_USER is not set
+STEAM_USER=${STEAM_USER:-anonymous}
+STEAM_PASS=${STEAM_PASS:-""}
+STEAM_AUTH=${STEAM_AUTH:-""}
 
-if [[ "${FRAMEWORK}" == "carbon" ]]; then
-    # Carbon: https://github.com/CarbonCommunity/Carbon.Core
-    echo "Updating Carbon..."
-    curl -sSL "https://github.com/CarbonCommunity/Carbon.Core/releases/download/production_build/Carbon.Linux.Release.tar.gz" | tar zx
-    echo "Done updating Carbon!"
+echo "Updating Rust server files for branch '${BRANCH}' (AppID: ${SRCDS_APPID})..."
+cd /mnt/server/steamcmd || exit 1 # Change to steamcmd directory
 
-    export DOORSTOP_ENABLED=1
-    export DOORSTOP_TARGET_ASSEMBLY="$(pwd)/carbon/managed/Carbon.Preloader.dll"
-    MODIFIED_STARTUP="LD_PRELOAD=$(pwd)/libdoorstop.so ${MODIFIED_STARTUP}"
+# Run SteamCMD update
+# Use +quit to ensure steamcmd exits after update
+# The 'validate' flag ensures file integrity and can fix corrupted files
+./steamcmd.sh +force_install_dir /mnt/server +login "${STEAM_USER}" "${STEAM_PASS}" "${STEAM_AUTH}" +app_update "${SRCDS_APPID}" ${BRANCH_FLAG} validate +quit
 
-elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
-    # Oxide: https://github.com/OxideMod/Oxide.Rust
-    echo "Updating uMod..."
-    curl -sSL "https://github.com/OxideMod/Oxide.Rust/releases/latest/download/Oxide.Rust-linux.zip" > umod.zip
-    unzip -o -q umod.zip
-    rm umod.zip
-    echo "Done updating uMod!"
-# else Vanilla, do nothing
+# Check if SteamCMD update was successful
+if [ $? -ne 0 ]; then
+    echo "ERROR: SteamCMD update failed! Check logs for details."
+    exit 1
 fi
 
-# Fix for Rust not starting
-export LD_LIBRARY_PATH=$(pwd)/RustDedicated_Data/Plugins/x86_64:$(pwd)
+echo "Rust server files updated successfully."
 
-# Run the Server using the wrapper
-echo "Starting Rust server via wrapper..."
+# --- Prepare startup command for the Node.js wrapper ---
+# Build the exact startup command string that the wrapper expects
+# This should match your egg's 'startup' field, but without the initial '.\/RustDedicated'
+# as the wrapper likely handles execution.
+
+MODIFIED_STARTUP="./RustDedicated -batchmode"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.port {{SERVER_PORT}}"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.queryport {{QUERY_PORT}}"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.identity \"rust\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +rcon.port {{RCON_PORT}}"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +rcon.web true"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.hostname \"{{HOSTNAME}}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.level \"{{LEVEL}}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.description \"{{DESCRIPTION}}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.url \"{{SERVER_URL}}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.headerimage \"{{SERVER_IMG}}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.logoimage \"{{SERVER_LOGO}}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.maxplayers {{MAX_PLAYERS}}"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +rcon.password \"{{RCON_PASS}}\""
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.saveinterval {{SAVEINTERVAL}}"
+MODIFIED_STARTUP="${MODIFIED_STARTUP} +app.port {{APP_PORT}}"
+
+# Add map URL or world size/seed logic as in your original egg's startup string
+if [ -z "${MAP_URL}" ]; then
+    MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.worldsize \"{{WORLD_SIZE}}\" +server.seed \"{{WORLD_SEED}}\""
+else
+    MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.levelurl {{MAP_URL}}"
+fi
+
+# Add additional arguments
+if [ -n "${ADDITIONAL_ARGS}" ]; then
+    MODIFIED_STARTUP="${MODIFIED_STARTUP} ${ADDITIONAL_ARGS}"
+fi
+
+# IMPORTANT: Replace Pterodactyl's template variables with actual environment variables
+# Pterodactyl replaces these placeholders BEFORE the entrypoint.sh is executed.
+# The `startup` string in your egg should already do this,
+# so the actual values will be substituted when the entrypoint runs.
+# However, if your wrapper expects the raw template (e.g., {{SERVER_PORT}}), you might need to adjust.
+# Assuming the Pterodactyl daemon already replaced them, we pass the built string.
+
+# Ensure we are in the server directory before executing the wrapper
+cd /mnt/server || exit 1
+
+echo "Starting server via Node.js wrapper: node /wrapper.js \"${MODIFIED_STARTUP}\""
+
+# Run the Node.js wrapper with the generated startup command
 node /wrapper.js "${MODIFIED_STARTUP}"
