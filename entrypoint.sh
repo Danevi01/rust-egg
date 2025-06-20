@@ -10,7 +10,7 @@ SRCDS_APPID=258550
 export HOME="/home/container"
 
 # Define the full path to the SteamCMD executable.
-# It's confirmed to be in /home/container/steamcmd/steamcmd.sh based on your previous output.
+# It's confirmed to be in /home/container/steamcmd/steamcmd.sh.
 STEAMCMD_PATH="/home/container/steamcmd/steamcmd.sh"
 
 # Check if the SteamCMD executable exists. If not, print an error and exit.
@@ -21,7 +21,6 @@ if [ ! -f "${STEAMCMD_PATH}" ]; then
 fi
 
 # Dynamically set the SteamCMD branch flag based on the Pterodactyl 'BRANCH' environment variable.
-# If BRANCH is set and not "release", use the -beta flag. Otherwise, default to release.
 BRANCH_FLAG=""
 if [ -n "${BRANCH}" ] && [ "${BRANCH}" != "release" ]; then
     echo "Selected Rust Branch: ${BRANCH}"
@@ -41,15 +40,10 @@ echo "Updating Rust server files for branch '${BRANCH}' (AppID: ${SRCDS_APPID}).
 cd /home/container/steamcmd || { echo "ERROR: Cannot change to SteamCMD directory. Exiting."; exit 1; }
 
 # Execute SteamCMD to update the Rust server files.
-# +force_install_dir /mnt/server tells SteamCMD to install the game files into the /mnt/server directory,
-# which is Pterodactyl's designated persistent storage for game data.
-# +app_update "${SRCDS_APPID}" uses the defined Rust App ID.
-# ${BRANCH_FLAG} applies the selected branch (e.g., -beta staging).
-# validate ensures file integrity and can repair corrupted files without full re-download.
-# +quit ensures SteamCMD exits cleanly after the update.
-./steamcmd.sh +force_install_dir /mnt/server +login "${STEAM_USER}" "${STEAM_PASS}" "${STEAM_AUTH}" +app_update "${SRCDS_APPID}" ${BRANCH_FLAG} validate +quit
+# --- WICHTIGE ÄNDERUNG HIER: force_install_dir ist jetzt /home/container ---
+./steamcmd.sh +force_install_dir /home/container +login "${STEAM_USER}" "${STEAM_PASS}" "${STEAM_AUTH}" +app_update "${SRCDS_APPID}" ${BRANCH_FLAG} validate +quit
 
-# Check the exit status of SteamCMD. If it's not 0, an error occurred during the update.
+# Check if SteamCMD update was successful
 if [ $? -ne 0 ]; then
     echo "ERROR: SteamCMD update failed! Check logs for details."
     exit 1
@@ -57,16 +51,16 @@ fi
 
 echo "Rust server files updated successfully."
 
-# --- NEUE ZEILEN FÜR BERECHTIGUNGEN ---
-echo "Setting correct file permissions for /mnt/server..."
-chown -R container:container /mnt/server
-chmod -R u+rwX /mnt/server
+# --- BERECHTIGUNGEN: WERDEN JETZT FÜR /home/container GESETZT ---
+# Dies ist notwendig, da SteamCMD die Dateien als 'root' herunterlädt,
+# der Server aber als 'container' Benutzer laufen muss.
+echo "Setting correct file permissions for /home/container (Rust game files)..."
+chown -R container:container /home/container
+chmod -R u+rwX /home/container
 # -----------------------------------
 
 # --- Prepare the startup command for the Node.js wrapper ---
-# Pterodactyl automatically replaces {{VARIABLE}} placeholders in the Egg's startup string
-# with actual environment variables (e.g., $SERVER_PORT) before this script runs.
-# Therefore, we use environment variables directly here to build the command.
+# Pterodactyl automatically replaces {{VARIABLE}} placeholders with actual environment variables.
 
 MODIFIED_STARTUP="./RustDedicated -batchmode"
 MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.port ${SERVER_PORT}"
@@ -97,20 +91,12 @@ if [ -n "${ADDITIONAL_ARGS}" ]; then
     MODIFIED_STARTUP="${MODIFIED_STARTUP} ${ADDITIONAL_ARGS}"
 fi
 
-# Ensure the /mnt/server directory exists. This is crucial as SteamCMD installs
-# the game files here, and the server expects to run from this location.
-mkdir -p /mnt/server
-
-# Change the current directory to /mnt/server.
-# The RustDedicated executable should be in this directory.
-# The Node.js wrapper will be executed from here, and it will then launch RustDedicated
-# relative to this path (e.g., ./RustDedicated).
-cd /mnt/server || { echo "ERROR: Cannot change to server game directory. Exiting."; exit 1; }
+# --- WICHTIGE ÄNDERUNG HIER: KEIN mkdir -p /mnt/server MEHR. cd jetzt nach /home/container ---
+# Wechseln Sie in das Verzeichnis, in dem die Rust-Spieldateien liegen sollen.
+# Da SteamCMD jetzt nach /home/container installiert, ist dies unser Arbeitsverzeichnis.
+cd /home/container || { echo "ERROR: Cannot change to server game directory. Exiting."; exit 1; }
 
 echo "Starting server via Node.js wrapper: node /wrapper.js \"${MODIFIED_STARTUP}\""
 
 # Execute the Node.js wrapper with the generated startup command.
-# Using 'exec' ensures that the Node.js process takes over PID 1, allowing for proper
-# signal handling (e.g., stopping the container gracefully).
-# Ensure 'node' is in the container's PATH and '/wrapper.js' is the correct path to your wrapper.
 exec node /wrapper.js "${MODIFIED_STARTUP}"
