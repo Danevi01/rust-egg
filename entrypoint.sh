@@ -24,10 +24,14 @@ if [ -z "${AUTO_UPDATE}" ] || [ "${AUTO_UPDATE}" == "1" ]; then
         ln -sf "$STEAMCLIENT_PATH" "$HOME/.steam/sdk64/steamclient.so"
         echo "Linked steamclient.so from $STEAMCLIENT_PATH to $HOME/.steam/sdk64/steamclient.so"
 
-        # NEW: Copy the correct steamclient.so to Rust's plugin directory for early access.
-        # This addresses the "Tried to access Steam interface before Init succeeded" error.
-        cp "$HOME/.steam/sdk64/steamclient.so" "$HOME/RustDedicated_Data/Plugins/x86_64/steamclient.so"
-        echo "Copied steamclient.so to Rust's plugin directory for early access."
+        # NEW ROBUST COPY: Copy the correct steamclient.so to Rust's plugin directory for early access.
+        # Use 'cp -L' to dereference the symlink and copy the actual file.
+        # If that fails, try a direct copy as a fallback.
+        cp -L "$HOME/.steam/sdk64/steamclient.so" "$HOME/RustDedicated_Data/Plugins/x86_64/steamclient.so" || {
+          echo "WARNING: Failed to copy steamclient.so using cp -L. Attempting a direct copy (might fail if symlink is broken)."
+          cp "$HOME/.steam/sdk64/steamclient.so" "$HOME/RustDedicated_Data/Plugins/x86_64/steamclient.so"
+        }
+        echo "Attempted to copy steamclient.so to Rust's plugin directory."
     else
         echo "WARNING: steamclient.so not found after SteamCMD update. This might cause issues."
     fi
