@@ -23,7 +23,9 @@
 FROM --platform=$TARGETOS/$TARGETARCH debian:bullseye-slim
 
 # NEUE ZEILE: Konfiguriere DNS-Server für den Container, um Auflösungsprobleme zu vermeiden
-RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf \
+# WICHTIG: Die Installation von resolvconf ermöglicht das Schreiben in /etc/resolv.conf
+RUN apt update && apt install -y resolvconf \
+    && echo "nameserver 8.8.8.8" > /etc/resolv.conf \
     && echo "nameserver 8.8.4.4" >> /etc/resolv.conf
 
 LABEL author="Isaac A." maintainer="isaac@isaacs.site"
