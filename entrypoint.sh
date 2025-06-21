@@ -84,9 +84,6 @@ echo "Setting correct file permissions for /home/container (Rust game files)..."
 chmod -R u+rwX /home/container
 
 # Modding Frameworks (Carbon/Oxide) logic
-# Carbon und Oxide spezifische Umgebungsvariablen setzen.
-# Wichtig: Wir manipulieren hier NICHT die STARTUP-Variable direkt, da sie bereits von Pterodactyl gesetzt ist.
-# Wir setzen nur die benötigten Umgebungsvariablen, die RustDedicated oder Carbon/Oxide brauchen.
 if [[ "${FRAMEWORK}" == "carbon" ]]; then
     echo "Updating Carbon..."
     curl -sSL "https://github.com/CarbonCommunity/Carbon.Core/releases/download/production_build/Carbon.Linux.Release.tar.gz" | tar zx
@@ -94,8 +91,6 @@ if [[ "${FRAMEWORK}" == "carbon" ]]; then
 
     export DOORSTOP_ENABLED=1
     export DOORSTOP_TARGET_ASSEMBLY="$(pwd)/carbon/managed/Carbon.Preloader.dll"
-    # LD_PRELOAD sollte hier als Umgebungsvariable gesetzt werden, wenn Carbon sie benötigt.
-    # Sie muss vorhanden sein, wenn das Spiel startet.
     export LD_PRELOAD="$(pwd)/libdoorstop.so"
 
 elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
@@ -107,15 +102,10 @@ elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
 fi
 
 # Fix for Rust not starting
-# IMPORTANT: Added /home/container/.steam/sdk64 to the LD_LIBRARY_PATH
 export LD_LIBRARY_PATH="/home/container/.steam/sdk64:$(pwd)/RustDedicated_Data/Plugins/x86_64:$(pwd)"
 
-# Ensure RustDedicated is executable before trying to run it.
+# Ensure RustDedicated is executable.
 chmod +x ./RustDedicated || { echo "ERROR: Could not make RustDedicated executable. Exiting."; exit 1; }
 
-# Dies ist der entscheidende Punkt: STARTUP ist bereits der komplette Befehl von Pterodactyl.
-# Die "eval exec" Kombination führt diesen String sicher aus, indem sie ihn korrekt splittet
-# und die darin enthaltenen Anführungszeichen korrekt interpretiert.
-echo "Server startup command: ${STARTUP}"
-echo "Running server via Node.js wrapper..."
-eval exec "${STARTUP}"
+# The script finishes here. The Pterodactyl Daemon will execute the STARTUP command next.
+echo "Entrypoint script finished. Preparing to execute Pterodactyl startup command..."
