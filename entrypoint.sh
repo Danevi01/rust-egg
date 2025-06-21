@@ -63,29 +63,24 @@ STEAM_AUTH=${STEAM_AUTH:-""}
 if [ -z "${AUTO_UPDATE}" ] || [ "${AUTO_UPDATE}" == "1" ]; then
     echo "Updating Rust server files for branch '${CURRENT_BRANCH}' (AppID: ${SRCDS_APPID})..."
 
-    # Save current directory, go to SteamCMD, run update, then go back to original directory.
-    # This is crucial to ensure RustDedicated is found later.
     CURRENT_DIR=$(pwd)
     cd /home/container/steamcmd || { echo "ERROR: Cannot change to SteamCMD directory. Exiting."; exit 1; }
 
     ./steamcmd.sh +force_install_dir /home/container +login "${STEAM_USER}" "${STEAM_PASS}" "${STEAM_AUTH}" +app_update "${SRCDS_APPID}" ${BRANCH_FLAG} validate +quit
 
-    # Check if SteamCMD update was successful
     if [ $? -ne 0 ]; then
         echo "ERROR: SteamCMD update failed! Check logs for details."
-        cd "${CURRENT_DIR}" # Ensure we return even on error
+        cd "${CURRENT_DIR}"
         exit 1
     fi
     echo "Rust server files updated successfully."
-    cd "${CURRENT_DIR}" # Return to the original directory (/home/container)
+    cd "${CURRENT_DIR}"
 else
     echo "Not updating game server as AUTO_UPDATE was set to 0. Starting Server."
 fi
 
 # Permissions anpassen
 echo "Setting correct file permissions for /home/container (Rust game files)..."
-# We only use chmod to adjust permissions for the current user (container user).
-# The chown command caused "Operation not permitted" errors, so it's removed.
 chmod -R u+rwX /home/container
 
 # Prepare the startup command for the Node.js wrapper
@@ -112,7 +107,8 @@ elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
 fi
 
 # Fix for Rust not starting
-export LD_LIBRARY_PATH="$(pwd)/RustDedicated_Data/Plugins/x86_64:$(pwd)"
+# IMPORTANT: Added /home/container/.steam/sdk64 to the LD_LIBRARY_PATH
+export LD_LIBRARY_PATH="/home/container/.steam/sdk64:$(pwd)/RustDedicated_Data/Plugins/x86_64:$(pwd)"
 
 # Ensure RustDedicated is executable before trying to run it.
 chmod +x ./RustDedicated || { echo "ERROR: Could not make RustDedicated executable. Exiting."; exit 1; }
