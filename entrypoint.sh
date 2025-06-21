@@ -40,23 +40,59 @@ STEAM_USER=${STEAM_USER:-anonymous}
 STEAM_PASS=${STEAM_PASS:-""}
 STEAM_AUTH=${STEAM_AUTH:-""}
 
-# --- UNTERSTÜTZTE: Logik für Neuinstallation bei Branch-Wechsel oder fehlendem SteamCMD ---
-# Dies wird immer ausgeführt, wenn ein Branch-Wechsel erkannt wird ODER SteamCMD fehlt.
-# Es stellt sicher, dass die korrekte Branch installiert ist.
-if [ "${LAST_INSTALLED_BRANCH}" != "${CURRENT_BRANCH}" ] || [ ! -f "${STEAMCMD_PATH}" ]; then
-    if [ -n "${LAST_INSTALLED_BRANCH}" ] && [ "${LAST_INSTALLED_BRANCH}" != "${CURRENT_BRANCH}" ]; then
-        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-        echo "!!! Branch change detected: '${LAST_INSTALLED_BRANCH}' -> '${CURRENT_BRANCH}' !!!"
-        echo "!!! Forcing a complete re-installation of server files via SteamCMD in entrypoint.sh. !!!"
-        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    elif [ ! -f "${STEAMCMD_PATH}" ]; then
-        echo "SteamCMD executable not found. This indicates a fresh installation or a corrupted one."
-        echo "Proceeding with SteamCMD installation/update from entrypoint."
+
+# --- Funktion zum vollständigen Löschen aller Serverdaten ---
+clean_all_server_data() {
+    echo "WARNING: Deleting ALL server data (including maps, saves, and configuration files) to ensure a clean branch installation."
+    # Temporär den Inhalt von .installed_branch speichern, da es sonst gelöscht werden könnte
+    local temp_branch_content=""
+    if [ -f "${INSTALLED_BRANCH_FILE}" ]; then
+        temp_branch_content=$(cat "${INSTALLED_BRANCH_FILE}")
+        echo "Temporarily saving .installed_branch content: ${temp_branch_content}"
     fi
 
+    # Lösche alle Dateien und Verzeichnisse im Home-Verzeichnis
+    echo "Deleting all contents of ${HOME}..."
+    rm -rf "${HOME}"/* # Löscht alle nicht-versteckten Dateien und Verzeichnisse
+    rm -rf "${HOME}"/.[!.]* # Löscht alle versteckten Dateien und Verzeichnisse (außer '.' und '..')
+    echo "All old server data removed from ${HOME}."
+
+    # .installed_branch wiederherstellen, falls gespeichert (wird später ohnehin aktualisiert)
+    if [ -n "${temp_branch_content}" ]; then
+        echo "${temp_branch_content}" > "${INSTALLED_BRANCH_FILE}"
+        echo "Restored .installed_branch content (will be updated later)."
+    fi
+}
+# --- Ende Funktion ---
+
+
+# --- Hauptlogik für Installation / Update ---
+SHOULD_PERFORM_UPDATE=0
+
+if [ "${LAST_INSTALLED_BRANCH}" != "${CURRENT_BRANCH}" ]; then
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "!!! Branch change detected: '${LAST_INSTALLED_BRANCH}' -> '${CURRENT_BRANCH}' !!!"
+    clean_all_server_data # <-- HIER WIRD ALLES GELÖSCHT!
+    echo "!!! Forcing a complete re-installation of server files via SteamCMD. !!!"
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    SHOULD_PERFORM_UPDATE=1
+elif [ ! -f "${STEAMCMD_PATH}" ]; then
+    echo "SteamCMD executable not found. This indicates a fresh installation or a corrupted one."
+    echo "Proceeding with SteamCMD installation/update from entrypoint."
+    SHOULD_PERFORM_UPDATE=1
+elif [ -z "${AUTO_UPDATE}" ] || [ "${AUTO_UPDATE}" == "1" ]; then
+    echo "No branch change detected. Auto-update is enabled. Performing standard Rust server file update."
+    SHOULD_PERFORM_UPDATE=1
+else
+    echo "Not updating game server as AUTO_UPDATE was set to 0. Starting Server without update."
+    SHOULD_PERFORM_UPDATE=0
+fi
+
+
+if [ "${SHOULD_PERFORM_UPDATE}" -eq 1 ]; then
     echo "Ensuring SteamCMD is installed and up-to-date..."
     mkdir -p /home/container/steamcmd # Sicherstellen, dass das Verzeichnis existiert
-    CURRENT_DIR=$(pwd)
+    CURRENT_WORKING_DIR=$(pwd) # Aktuelles Arbeitsverzeichnis speichern
     cd /home/container/steamcmd || { echo "ERROR: Cannot change to SteamCMD directory. Exiting."; exit 1; }
     curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - # Sicherstellen, dass SteamCMD vorhanden ist
 
@@ -64,12 +100,12 @@ if [ "${LAST_INSTALLED_BRANCH}" != "${CURRENT_BRANCH}" ] || [ ! -f "${STEAMCMD_P
     ./steamcmd.sh +force_install_dir /home/container +login "${STEAM_USER}" "${STEAM_PASS}" "${STEAM_AUTH}" +app_update "${SRCDS_APPID}" ${BRANCH_FLAG} validate +quit
 
     if [ $? -ne 0 ]; then
-        echo "ERROR: SteamCMD update failed during forced re-installation! Exiting."
-        cd "${CURRENT_DIR}"
+        echo "ERROR: SteamCMD update failed! Check logs for details."
+        cd "${CURRENT_WORKING_DIR}" # Zurück zum ursprünglichen Arbeitsverzeichnis
         exit 1
     fi
-    echo "SteamCMD forced update/install completed successfully."
-    cd "${CURRENT_DIR}"
+    echo "SteamCMD update/install completed successfully."
+    cd "${CURRENT_WORKING_DIR}" # Zurück zum ursprünglichen Arbeitsverzeichnis
 
     # Wichtig: Kopiere die SteamSDK-Dateien an den richtigen Ort NACH der Installation.
     echo "Copying SteamSDK files..."
@@ -80,30 +116,8 @@ if [ "${LAST_INSTALLED_BRANCH}" != "${CURRENT_BRANCH}" ] || [ ! -f "${STEAMCMD_P
     echo "SteamSDK files copied."
 
     # Schreibe die aktuelle Branch in die Datei, NACHDEM die Installation abgeschlossen ist.
-    # Dies verhindert einen weiteren Re-Install-Loop beim nächsten Start.
     echo "${CURRENT_BRANCH}" > "${INSTALLED_BRANCH_FILE}"
-
-else # Wenn kein Branch-Wechsel ODER fehlendes SteamCMD erkannt wurde, fahren wir normal fort (optionales Update).
-    echo "No branch change detected or SteamCMD already present. Proceeding with normal server startup."
-    # Auto-update logic (Dieser Block wird weiterhin für normale Updates verwendet, wenn AUTO_UPDATE = 1)
-    if [ -z "${AUTO_UPDATE}" ] || [ "${AUTO_UPDATE}" == "1" ]; then
-        echo "Performing standard Rust server file update for branch '${CURRENT_BRANCH}' (AppID: ${SRCDS_APPID})..."
-
-        CURRENT_DIR=$(pwd)
-        cd /home/container/steamcmd || { echo "ERROR: Cannot change to SteamCMD directory. Exiting."; exit 1; }
-
-        ./steamcmd.sh +force_install_dir /home/container +login "${STEAM_USER}" "${STEAM_PASS}" "${STEAM_AUTH}" +app_update "${SRCDS_APPID}" ${BRANCH_FLAG} validate +quit
-
-        if [ $? -ne 0 ]; then
-            echo "ERROR: SteamCMD update failed! Check logs for details."
-            cd "${CURRENT_DIR}"
-            exit 1
-        fi
-        echo "Rust server files updated successfully."
-        cd "${CURRENT_DIR}"
-    else
-        echo "Not updating game server as AUTO_UPDATE was set to 0. Starting Server."
-    fi
+    echo "Updated .installed_branch to: ${CURRENT_BRANCH}"
 fi
 
 # Permissions anpassen
@@ -143,10 +157,10 @@ chmod +x ./RustDedicated || { echo "ERROR: Could not make RustDedicated executab
 CLEAN_STARTUP="${STARTUP}"
 CLEAN_STARTUP="${CLEAN_STARTUP//\"{{RCON_PASS}}\"/{{RCON_PASS}}}" # Remove literal \" and \"
 CLEAN_STARTUP="${CLEAN_STARTUP//\"{{HOSTNAME}}\"/{{HOSTNAME}}}" # Remove literal \" and \"
-CLEAN_STARTUP="${CLEAN_STARTUP//\"{{DESCRIPTION}}\"/{{DESCRIPTION}}}" # Remove literal \" and \"
+CLEAN_STARTUP="${CLE_STARTUP//\"{{DESCRIPTION}}\"/{{DESCRIPTION}}}" # Remove literal \" and \"
 # Add other variables if they also use escaped quotes
 CLEAN_STARTUP="${CLEAN_STARTUP//\"{{LEVEL}}\"/{{LEVEL}}}" # Added for consistency
-CLEAN_STARTUP="${CLEAN_STARTUP//\"{{SERVER_IMG}}\"/{{SERVER_IMG}}}" # Added for consistency
+CLEAN_STARTUP="${CLE_STARTUP//\"{{SERVER_IMG}}\"/{{SERVER_IMG}}}" # Added for consistency
 CLEAN_STARTUP="${CLEAN_STARTUP//\"{{SERVER_LOGO}}\"/{{SERVER_LOGO}}}" # Added for consistency
 
 
