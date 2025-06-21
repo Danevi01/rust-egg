@@ -159,7 +159,7 @@ FINAL_STARTUP=$(echo "${CLEAN_STARTUP}" \
     -e "s|{{RCON_PASS}}|\"${RCON_PASS}\"|g" \
     -e "s|{{HOSTNAME}}|\"${HOSTNAME}\"|g" \
     -e "s|{{LEVEL}}|\"${LEVEL}\"|g" \
-    -e "s|s|{{SERVER_IMG}}|\"${SERVER_IMG}\"|g" \
+    -e "s|{{SERVER_IMG}}|\"${SERVER_IMG}\"|g" \
     -e "s|{{SERVER_LOGO}}|\"${SERVER_LOGO}\"|g" \
     -e "s|{{WORLD_SEED}}|${WORLD_SEED}|g" \
     -e "s|{{WORLD_SIZE}}|${WORLD_SIZE}|g" \
