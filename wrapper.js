@@ -9,8 +9,9 @@ fs.writeFile("latest.log", "", (err) => {
 });
 
 // `process.argv` enthält: ['/path/to/node', '/wrapper.js', './RustDedicated', '-batchmode', ...]
-// Wir brauchen ab './RustDedicated'
-const argsFromPterodactyl = process.argv.slice(2); // ['./RustDedicated', '-batchmode', ...]
+// Wir interessieren uns nur für die Argumente, die NACH dem Wrapper-Skript kommen.
+// argsFromPterodactyl wird in diesem Fall sein: ['./RustDedicated', '-batchmode', '-nographics', ...]
+const argsFromPterodactyl = process.argv.slice(2);
 
 if (argsFromPterodactyl.length < 1) {
     console.log("Error: No startup command or arguments provided to the wrapper.");
@@ -18,13 +19,16 @@ if (argsFromPterodactyl.length < 1) {
 }
 
 // Der erste Eintrag im Array ist der Pfad zum RustDedicated-Executable
-const rustExecutablePath = argsFromPterodactyl[0]; // Das sollte './RustDedicated' sein
+// In diesem Fall sollte es './RustDedicated' sein.
+const rustExecutablePath = argsFromPterodactyl[0];
 
-// Alle restlichen Einträge sind die Argumente für RustDedicated
-const rustArguments = argsFromPterodactyl.slice(1); // ['-batchmode', '-nographics', ...]
+// Alle restlichen Einträge sind die tatsächlichen Argumente für RustDedicated.
+// Dies sind die Flags und Werte, die wir RustDedicated übergeben wollen (z.B. '-batchmode', '-nographics', '+server.port', '28000').
+const rustArguments = argsFromPterodactyl.slice(1);
 
 console.log("Starting Rust...");
-console.log(`Attempting to execute: ${rustExecutablePath} ${rustArguments.join(' ')}`); // Für Debugging
+// Debug-Ausgabe, um zu sehen, was tatsächlich an 'spawn' übergeben wird.
+console.log(`Executing RustDedicated with: ${rustExecutablePath} ${rustArguments.join(' ')}`);
 
 const seenPercentage = {};
 
@@ -40,13 +44,16 @@ function filter(data) {
 }
 
 let exited = false;
-// WICHTIG: spawn() mit dem direkten Executable-Pfad und den Argumenten aufrufen
+// WICHTIG: spawn() mit dem direkten Executable-Pfad und den Argumenten aufrufen.
+// NICHT 'node /wrapper.js ...' hier nochmal aufrufen!
 const gameProcess = spawn(rustExecutablePath, rustArguments, {
-    stdio: 'inherit',
-    cwd: '/home/container' // Wichtig: Pfad auf das Server-Verzeichnis setzen
+    stdio: 'inherit', // Standardausgabe des Child-Prozesses direkt in die des Wrappers leiten
+    cwd: '/home/container' // Wichtig: Den Arbeitsbereich auf das Server-Verzeichnis setzen
 });
 
 gameProcess.on('error', (err) => {
+    // Wenn spawn fehlschlägt, ist es oft ein ENOENT (Programm nicht gefunden)
+    // oder ein Berechtigungsproblem.
     console.error(`Failed to start RustDedicated process: ${err.message}`);
     console.error(err); // Den vollständigen Fehler-Stack ausgeben
     process.exit(1);
@@ -59,7 +66,7 @@ gameProcess.on('close', function (code, signal) {
     } else if (signal) {
         console.log(`Main game process exited due to signal ${signal}`);
     }
-    process.exit(code || 0);
+    process.exit(code || 0); // Exit mit dem Exit-Code des Spiels, oder 0 wenn durch Signal beendet
 });
 
 function initialListener(data) {
@@ -96,7 +103,6 @@ const poll = function () {
     const serverPort = process.env.RCON_PORT;
     const serverPassword = process.env.RCON_PASS;
 
-    // 'ws' Modul sollte im Dockerfile installiert sein.
     const WebSocket = require("ws");
 
     const ws = new WebSocket(`ws://${serverHostname}:${serverPort}/${serverPassword}`);
@@ -129,7 +135,7 @@ const poll = function () {
 
     ws.on("error", function (err) {
         waiting = true;
-        console.log("Waiting for RCON to come up... (Error: " + err.message + ")"); // Mehr Details
+        console.log("Waiting for RCON to come up... (Error: " + err.message + ")");
         setTimeout(poll, 5000);
     });
 
