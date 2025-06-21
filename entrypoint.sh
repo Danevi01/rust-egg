@@ -8,7 +8,6 @@ SRCDS_APPID=258550
 export HOME="/home/container"
 
 # Define the full path to the SteamCMD executable.
-# Based on your existing setup, it's expected in /home/container/steamcmd.
 STEAMCMD_PATH="/home/container/steamcmd/steamcmd.sh"
 
 # File to store the last installed branch to detect changes.
@@ -21,103 +20,85 @@ export INTERNAL_IP=`ip route get 1 | awk '{print $(NF-2);exit}'`
 
 # Read the current branch from the environment variable. Default to 'release'.
 CURRENT_BRANCH="${BRANCH:-release}"
-echo "Configured Rust Branch: ${CURRENT_BRANCH}"
-
-# Read the last installed branch from the flag file.
-LAST_INSTALLED_BRANCH=""
-if [ -f "${INSTALLED_BRANCH_FILE}" ]; then
-    LAST_INSTALLED_BRANCH=$(cat "${INSTALLED_BRANCH_FILE}")
-    echo "Last installed Branch detected: ${LAST_INSTALLED_BRANCH}"
+echo "Configured Rust Branch: <span class="math-inline">\{CURRENT\_BRANCH\}"
+\# Read the last installed branch from the flag file\.
+LAST\_INSTALLED\_BRANCH\=""
+if \[ \-f "</span>{INSTALLED_BRANCH_FILE}" ]; then
+    LAST_INSTALLED_BRANCH=<span class="math-inline">\(cat "</span>{INSTALLED_BRANCH_FILE}")
+    echo "Last installed Branch detected: <span class="math-inline">\{LAST\_INSTALLED\_BRANCH\}"
 fi
-
-# --- Re-installation Trigger Logic ---
-# Trigger a re-installation if:
-# 1. The configured branch has changed from the last installed one.
-# 2. SteamCMD executable is not found (implies a fresh install or a corrupted one).
-if [ "${LAST_INSTALLED_BRANCH}" != "${CURRENT_BRANCH}" ] || [ ! -f "${STEAMCMD_PATH}" ]; then
-    if [ -n "${LAST_INSTALLED_BRANCH}" ] && [ "${LAST_INSTALLED_BRANCH}" != "${CURRENT_BRANCH}" ]; then
-        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-        echo "!!! Branch change detected: '${LAST_INSTALLED_BRANCH}' -> '${CURRENT_BRANCH}' !!!"
-        echo "!!! Forcing a complete re-installation of server files. !!!"
-        echo "!!! Deleting all files in /home/container to trigger Pterodactyl's install script. !!!"
-        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-        # Delete all files to force Pterodactyl to run the egg's installation script again.
-        rm -rf /home/container/*
-        exit 1 # Exit with error to trigger Pterodactyl's reinstall mechanism
-    elif [ ! -f "${STEAMCMD_PATH}" ]; then
+\# \-\-\- Re\-installation Trigger Logic \-\-\-
+if \[ "</span>{LAST_INSTALLED_BRANCH}" != "<span class="math-inline">\{CURRENT\_BRANCH\}" \] \|\| \[ \! \-f "</span>{STEAMCMD_PATH}" ]; then
+    if [ -n "<span class="math-inline">\{LAST\_INSTALLED\_BRANCH\}" \] && \[ "</span>{LAST_INSTALLED_BRANCH}" != "<span class="math-inline">\{CURRENT\_BRANCH\}" \]; then
+echo "\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!"
+echo "\!\!\! Branch change detected\: '</span>{LAST_INSTALLED_BRANCH}' -> '<span class="math-inline">\{CURRENT\_BRANCH\}' \!\!\!"
+echo "\!\!\! Forcing a complete re\-installation of server files\. \!\!\!"
+echo "\!\!\! Deleting all files in /home/container to trigger Pterodactyl's install script\. \!\!\!"
+echo "\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!\!"
+rm \-rf /home/container/\*
+exit 1 \# Exit with error to trigger Pterodactyl's reinstall mechanism
+elif \[ \! \-f "</span>{STEAMCMD_PATH}" ]; then
         echo "SteamCMD executable not found. This indicates a fresh installation or a corrupted one."
         echo "Proceeding with SteamCMD installation/update from entrypoint."
     fi
 fi
 
 # Write the current branch to the file so we can detect future changes.
-# This happens AFTER the re-install check. If a reinstall was triggered,
-# this file would have been deleted and will be written fresh after the new installation is complete.
-echo "${CURRENT_BRANCH}" > "${INSTALLED_BRANCH_FILE}"
+echo "<span class="math-inline">\{CURRENT\_BRANCH\}" \> "</span>{INSTALLED_BRANCH_FILE}"
 
 # Dynamically set the SteamCMD branch flag.
 BRANCH_FLAG=""
 if [ "${CURRENT_BRANCH}" != "release" ]; then
-    BRANCH_FLAG="-beta ${CURRENT_BRANCH}"
+    BRANCH_FLAG="-beta <span class="math-inline">\{CURRENT\_BRANCH\}"
 fi
+\# SteamCMD login details\.
+STEAM\_USER\=</span>{STEAM_USER:-anonymous}
+STEAM_PASS=<span class="math-inline">\{STEAM\_PASS\:\-""\}
+STEAM\_AUTH\=</span>{STEAM_AUTH:-""}
 
-# SteamCMD login details. Use 'anonymous' if STEAM_USER is not provided.
-STEAM_USER=${STEAM_USER:-anonymous}
-STEAM_PASS=${STEAM_PASS:-""}
-STEAM_AUTH=${STEAM_AUTH:-""}
-
-# Auto-update logic (from your original entrypoint)
-if [ -z "${AUTO_UPDATE}" ] || [ "${AUTO_UPDATE}" == "1" ]; then
-    echo "Updating Rust server files for branch '${CURRENT_BRANCH}' (AppID: ${SRCDS_APPID})..."
-
-    # Change the current directory to where SteamCMD's executable is located.
-    # This assumes your Egg's installation script correctly places steamcmd.sh into /home/container/steamcmd.
+# Auto-update logic
+if [ -z "<span class="math-inline">\{AUTO\_UPDATE\}" \] \|\| \[ "</span>{AUTO_UPDATE}" == "1" ]; then
+    echo "Updating Rust server files for branch '${CURRENT_BRANCH}' (AppID: <span class="math-inline">\{SRCDS\_APPID\}\)\.\.\."
+\# Save current directory, go to SteamCMD, run update, then go back to original directory\.
+\# This is crucial to ensure RustDedicated is found later\.
+CURRENT\_DIR\=</span>(pwd)
     cd /home/container/steamcmd || { echo "ERROR: Cannot change to SteamCMD directory. Exiting."; exit 1; }
 
-    # Execute SteamCMD to update the Rust server files.
-    # +force_install_dir /home/container tells SteamCMD to install the game files into the /home/container directory.
-    ./steamcmd.sh +force_install_dir /home/container +login "${STEAM_USER}" "${STEAM_PASS}" "${STEAM_AUTH}" +app_update "${SRCDS_APPID}" ${BRANCH_FLAG} validate +quit
+    ./steamcmd.sh +force_install_dir /home/container +login "<span class="math-inline">\{STEAM\_USER\}" "</span>{STEAM_PASS}" "<span class="math-inline">\{STEAM\_AUTH\}" \+app\_update "</span>{SRCDS_APPID}" ${BRANCH_FLAG} validate +quit
 
     # Check if SteamCMD update was successful
-    if [ $? -ne 0 ]; then
-        echo "ERROR: SteamCMD update failed! Check logs for details."
+    if [ <span class="math-inline">? \-ne 0 \]; then
+echo "ERROR\: SteamCMD update failed\! Check logs for details\."
+cd "</span>{CURRENT_DIR}" # Ensure we return even on error
         exit 1
     fi
     echo "Rust server files updated successfully."
+    cd "${CURRENT_DIR}" # Return to the original directory (/home/container)
 else
     echo "Not updating game server as AUTO_UPDATE was set to 0. Starting Server."
 fi
 
----
-
 # Permissions anpassen
-
-**WICHTIG:** Da `chown` die "Operation not permitted"-Fehler verursacht hat, habe ich diesen Befehl entfernt. Wir verlassen uns nun darauf, dass das `chmod` ausreicht, um dem `container`-Benutzer Schreibrechte zu geben. Wenn die Dateien von `root` erstellt wurden, erlaubt `chmod` dem `container`-Benutzer, darauf zuzugreifen, ohne den Besitzer zu wechseln.
-
----
-
 echo "Setting correct file permissions for /home/container (Rust game files)..."
-# Removed chown command as it causes "Operation not permitted" error.
-# We are relying solely on chmod for user access.
+# We only use chmod to adjust permissions for the current user (container user).
+# The chown command caused "Operation not permitted" errors, so it's removed.
 chmod -R u+rwX /home/container
 
 # Prepare the startup command for the Node.js wrapper
-# This uses the STARTUP variable from the Egg configuration.
 MODIFIED_STARTUP=`eval echo $(echo ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')`
 
-echo "Server startup command: ${MODIFIED_STARTUP}"
-
-# Modding Frameworks (Carbon/Oxide) logic from your original entrypoint
-if [[ "${FRAMEWORK}" == "carbon" ]]; then
+echo "Server startup command: <span class="math-inline">\{MODIFIED\_STARTUP\}"
+\# Modding Frameworks \(Carbon/Oxide\) logic
+if \[\[ "</span>{FRAMEWORK}" == "carbon" ]]; then
     echo "Updating Carbon..."
     curl -sSL "https://github.com/CarbonCommunity/Carbon.Core/releases/download/production_build/Carbon.Linux.Release.tar.gz" | tar zx
     echo "Done updating Carbon!"
 
     export DOORSTOP_ENABLED=1
-    export DOORSTOP_TARGET_ASSEMBLY="$(pwd)/carbon/managed/Carbon.Preloader.dll"
-    MODIFIED_STARTUP="LD_PRELOAD=$(pwd)/libdoorstop.so ${MODIFIED_STARTUP}"
+    export DOORSTOP_TARGET_ASSEMBLY="<span class="math-inline">\(pwd\)/carbon/managed/Carbon\.Preloader\.dll"
+MODIFIED\_STARTUP\="LD\_PRELOAD\=</span>(pwd)/libdoorstop.so ${MODIFIED_STARTUP}"
 
-elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
+elif [[ "<span class="math-inline">OXIDE" \=\= "1"</12\> \]\] \|\| \[\[ "</span>{FRAMEWORK}" == "oxide" ]]; then
     echo "Updating uMod..."
     curl -sSL "https://github.com/OxideMod/Oxide.Rust/releases/latest/download/Oxide.Rust-linux.zip" > umod.zip
     unzip -o -q umod.zip
@@ -125,10 +106,11 @@ elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
     echo "Done updating uMod!"
 fi
 
-# Fix for Rust not starting (original from your entrypoint)
-export LD_LIBRARY_PATH=$(pwd)/RustDedicated_Data/Plugins/x86_64:$(pwd)
+# Fix for Rust not starting
+export LD_LIBRARY_PATH=<span class="math-inline">\(pwd\)/RustDedicated\_Data/Plugins/x86\_64\:</span>(pwd)
 
 # Ensure RustDedicated is executable before trying to run it.
+# It should be found in the current directory, which should now be /home/container
 chmod +x ./RustDedicated || { echo "ERROR: Could not make RustDedicated executable. Exiting."; exit 1; }
 
 echo "Running server via Node.js wrapper..."
