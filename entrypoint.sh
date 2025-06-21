@@ -44,20 +44,17 @@ STEAM_AUTH=${STEAM_AUTH:-""}
 # --- Funktion zum vollständigen Löschen aller Serverdaten ---
 clean_all_server_data() {
     echo "WARNING: Deleting ALL server data (including maps, saves, and configuration files) to ensure a clean branch installation."
-    # Temporär den Inhalt von .installed_branch speichern, da es sonst gelöscht werden könnte
     local temp_branch_content=""
     if [ -f "${INSTALLED_BRANCH_FILE}" ]; then
         temp_branch_content=$(cat "${INSTALLED_BRANCH_FILE}")
         echo "Temporarily saving .installed_branch content: ${temp_branch_content}"
     fi
 
-    # Lösche alle Dateien und Verzeichnisse im Home-Verzeichnis
     echo "Deleting all contents of ${HOME}..."
     rm -rf "${HOME}"/* # Löscht alle nicht-versteckten Dateien und Verzeichnisse
     rm -rf "${HOME}"/.[!.]* # Löscht alle versteckten Dateien und Verzeichnisse (außer '.' und '..')
     echo "All old server data removed from ${HOME}."
 
-    # .installed_branch wiederherstellen, falls gespeichert (wird später ohnehin aktualisiert)
     if [ -n "${temp_branch_content}" ]; then
         echo "${temp_branch_content}" > "${INSTALLED_BRANCH_FILE}"
         echo "Restored .installed_branch content (will be updated later)."
@@ -107,7 +104,6 @@ if [ "${SHOULD_PERFORM_UPDATE}" -eq 1 ]; then
     echo "SteamCMD update/install completed successfully."
     cd "${CURRENT_WORKING_DIR}" # Zurück zum ursprünglichen Arbeitsverzeichnis
 
-    # Wichtig: Kopiere die SteamSDK-Dateien an den richtigen Ort NACH der Installation.
     echo "Copying SteamSDK files..."
     mkdir -p /home/container/.steam/sdk32
     cp -v /home/container/steamcmd/linux32/steamclient.so /home/container/.steam/sdk32/steamclient.so
@@ -115,12 +111,10 @@ if [ "${SHOULD_PERFORM_UPDATE}" -eq 1 ]; then
     cp -v /home/container/steamcmd/linux64/steamclient.so /home/container/.steam/sdk64/steamclient.so
     echo "SteamSDK files copied."
 
-    # Schreibe die aktuelle Branch in die Datei, NACHDEM die Installation abgeschlossen ist.
     echo "${CURRENT_BRANCH}" > "${INSTALLED_BRANCH_FILE}"
     echo "Updated .installed_branch to: ${CURRENT_BRANCH}"
 fi
 
-# Permissions anpassen
 echo "Setting correct file permissions for /home/container (Rust game files)..."
 chmod -R u+rwX /home/container
 
@@ -149,11 +143,9 @@ export LD_LIBRARY_PATH="/home/container/.steam/sdk64:$(pwd)/RustDedicated_Data/P
 chmod +x ./RustDedicated || { echo "ERROR: Could not make RustDedicated executable. Exiting."; exit 1; }
 
 # --- Manual variable substitution for the startup command ---
-# Diese Logik ersetzt die Pterodactyl-Platzhalter durch ihre tatsächlichen Werte.
-# Variablen wie HOSTNAME und DESCRIPTION, die Leerzeichen enthalten können,
-# werden in doppelte Anführungszeichen gesetzt, um korrekt übergeben zu werden.
-# Die Werte für {{SERVER_IMG}} und {{SERVER_LOGO}} werden von Rust selbst als 1 oder 0 interpretiert,
-# wenn sie nicht als URLs vorliegen, daher behandeln wir sie hier als Strings.
+# This logic replaces the Pterodactyl placeholders with their actual values.
+# Variables like HOSTNAME and DESCRIPTION, which can contain spaces,
+# are enclosed in double quotes for correct passing.
 FINAL_STARTUP=$(echo "${STARTUP}" \
     | sed -e "s|{{SERVER_PORT}}|${SERVER_PORT}|g" \
     -e "s|{{RCON_PORT}}|${RCON_PORT}|g" \
@@ -171,6 +163,15 @@ FINAL_STARTUP=$(echo "${STARTUP}" \
     -e "s|{{APP_PORT}}|${APP_PORT}|g" \
     -e "s|{{ADDITIONAL_ARGS}}|${ADDITIONAL_ARGS}|g" \
 )
+
+# Handle MAP_URL separately: add +server.levelurl ONLY if MAP_URL is not empty
+MAP_URL_ARG=""
+if [ -n "${MAP_URL}" ]; then
+    MAP_URL_ARG=" +server.levelurl \"${MAP_URL}\""
+fi
+
+# Append MAP_URL_ARG to FINAL_STARTUP
+FINAL_STARTUP="${FINAL_STARTUP}${MAP_URL_ARG}"
 
 echo "Server startup command (after substitution): ${FINAL_STARTUP}"
 echo "Running server via Node.js wrapper..."
