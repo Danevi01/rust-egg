@@ -114,4 +114,4 @@ export LD_LIBRARY_PATH="/home/container/.steam/sdk64:$(pwd)/RustDedicated_Data/P
 chmod +x ./RustDedicated || { echo "ERROR: Could not make RustDedicated executable. Exiting."; exit 1; }
 
 echo "Running server via Node.js wrapper..."
-exec node /wrapper.js "${MODIFIED_STARTUP}"
+exec node /wrapper.js "$@"
