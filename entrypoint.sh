@@ -88,11 +88,17 @@ else
     echo "Not updating game server as AUTO_UPDATE was set to 0. Starting Server."
 fi
 
-# Permissions: Ensure 'container' user has write access.
-# This is crucial because SteamCMD might download files as 'root' during installation
-# (especially if it runs from the Pterodactyl installer's container, or the entrypoint as root initially).
+---
+
+# Permissions anpassen
+
+**WICHTIG:** Da `chown` die "Operation not permitted"-Fehler verursacht hat, habe ich diesen Befehl entfernt. Wir verlassen uns nun darauf, dass das `chmod` ausreicht, um dem `container`-Benutzer Schreibrechte zu geben. Wenn die Dateien von `root` erstellt wurden, erlaubt `chmod` dem `container`-Benutzer, darauf zuzugreifen, ohne den Besitzer zu wechseln.
+
+---
+
 echo "Setting correct file permissions for /home/container (Rust game files)..."
-chown -R container:container /home/container || { echo "WARNING: Failed to set ownership for /home/container. Permissions might be an issue."; }
+# Removed chown command as it causes "Operation not permitted" error.
+# We are relying solely on chmod for user access.
 chmod -R u+rwX /home/container
 
 # Prepare the startup command for the Node.js wrapper
