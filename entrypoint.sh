@@ -83,12 +83,10 @@ fi
 echo "Setting correct file permissions for /home/container (Rust game files)..."
 chmod -R u+rwX /home/container
 
-# Prepare the startup command for the Node.js wrapper
-MODIFIED_STARTUP=$(eval echo "$(echo "${STARTUP}" | sed -e 's/{{/${/g' -e 's/}}/}/g')")
-
-echo "Server startup command: ${MODIFIED_STARTUP}"
-
 # Modding Frameworks (Carbon/Oxide) logic
+# Carbon und Oxide spezifische Umgebungsvariablen setzen.
+# Wichtig: Wir manipulieren hier NICHT die STARTUP-Variable direkt, da sie bereits von Pterodactyl gesetzt ist.
+# Wir setzen nur die benötigten Umgebungsvariablen, die RustDedicated oder Carbon/Oxide brauchen.
 if [[ "${FRAMEWORK}" == "carbon" ]]; then
     echo "Updating Carbon..."
     curl -sSL "https://github.com/CarbonCommunity/Carbon.Core/releases/download/production_build/Carbon.Linux.Release.tar.gz" | tar zx
@@ -96,7 +94,9 @@ if [[ "${FRAMEWORK}" == "carbon" ]]; then
 
     export DOORSTOP_ENABLED=1
     export DOORSTOP_TARGET_ASSEMBLY="$(pwd)/carbon/managed/Carbon.Preloader.dll"
-    MODIFIED_STARTUP="LD_PRELOAD=$(pwd)/libdoorstop.so ${MODIFIED_STARTUP}"
+    # LD_PRELOAD sollte hier als Umgebungsvariable gesetzt werden, wenn Carbon sie benötigt.
+    # Sie muss vorhanden sein, wenn das Spiel startet.
+    export LD_PRELOAD="$(pwd)/libdoorstop.so"
 
 elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
     echo "Updating uMod..."
@@ -113,5 +113,9 @@ export LD_LIBRARY_PATH="/home/container/.steam/sdk64:$(pwd)/RustDedicated_Data/P
 # Ensure RustDedicated is executable before trying to run it.
 chmod +x ./RustDedicated || { echo "ERROR: Could not make RustDedicated executable. Exiting."; exit 1; }
 
+# Dies ist der entscheidende Punkt: STARTUP ist bereits der komplette Befehl von Pterodactyl.
+# Die "eval exec" Kombination führt diesen String sicher aus, indem sie ihn korrekt splittet
+# und die darin enthaltenen Anführungszeichen korrekt interpretiert.
+echo "Server startup command: ${STARTUP}"
 echo "Running server via Node.js wrapper..."
-exec node /wrapper.js "$@"
+eval exec "${STARTUP}"
