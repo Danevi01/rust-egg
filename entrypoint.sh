@@ -29,26 +29,7 @@ if [ -f "${INSTALLED_BRANCH_FILE}" ]; then
     echo "Last installed Branch detected: ${LAST_INSTALLED_BRANCH}"
 fi
 
-# --- Re-installation Trigger Logic ---
-if [ "${LAST_INSTALLED_BRANCH}" != "${CURRENT_BRANCH}" ] || [ ! -f "${STEAMCMD_PATH}" ]; then
-    if [ -n "${LAST_INSTALLED_BRANCH}" ] && [ "${LAST_INSTALLED_BRANCH}" != "${CURRENT_BRANCH}" ]; then
-        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-        echo "!!! Branch change detected: '${LAST_INSTALLED_BRANCH}' -> '${CURRENT_BRANCH}' !!!"
-        echo "!!! Forcing a complete re-installation of server files. !!!"
-        echo "!!! Deleting all files in /home/container to trigger Pterodactyl's install script. !!!"
-        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-        rm -rf /home/container/*
-        exit 1 # Exit with error to trigger Pterodactyl's reinstall mechanism
-    elif [ ! -f "${STEAMCMD_PATH}" ]; then
-        echo "SteamCMD executable not found. This indicates a fresh installation or a corrupted one."
-        echo "Proceeding with SteamCMD installation/update from entrypoint."
-    fi
-fi
-
-# Write the current branch to the file so we can detect future changes.
-echo "${CURRENT_BRANCH}" > "${INSTALLED_BRANCH_FILE}"
-
-# Dynamically set the SteamCMD branch flag.
+# Dynamically set the SteamCMD branch flag based on CURRENT_BRANCH.
 BRANCH_FLAG=""
 if [ "${CURRENT_BRANCH}" != "release" ]; then
     BRANCH_FLAG="-beta ${CURRENT_BRANCH}"
@@ -59,24 +40,70 @@ STEAM_USER=${STEAM_USER:-anonymous}
 STEAM_PASS=${STEAM_PASS:-""}
 STEAM_AUTH=${STEAM_AUTH:-""}
 
-# Auto-update logic
-if [ -z "${AUTO_UPDATE}" ] || [ "${AUTO_UPDATE}" == "1" ]; then
-    echo "Updating Rust server files for branch '${CURRENT_BRANCH}' (AppID: ${SRCDS_APPID})..."
+# --- UNTERSTÜTZTE: Logik für Neuinstallation bei Branch-Wechsel oder fehlendem SteamCMD ---
+# Dies wird immer ausgeführt, wenn ein Branch-Wechsel erkannt wird ODER SteamCMD fehlt.
+# Es stellt sicher, dass die korrekte Branch installiert ist.
+if [ "${LAST_INSTALLED_BRANCH}" != "${CURRENT_BRANCH}" ] || [ ! -f "${STEAMCMD_PATH}" ]; then
+    if [ -n "${LAST_INSTALLED_BRANCH}" ] && [ "${LAST_INSTALLED_BRANCH}" != "${CURRENT_BRANCH}" ]; then
+        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        echo "!!! Branch change detected: '${LAST_INSTALLED_BRANCH}' -> '${CURRENT_BRANCH}' !!!"
+        echo "!!! Forcing a complete re-installation of server files via SteamCMD in entrypoint.sh. !!!"
+        echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    elif [ ! -f "${STEAMCMD_PATH}" ]; then
+        echo "SteamCMD executable not found. This indicates a fresh installation or a corrupted one."
+        echo "Proceeding with SteamCMD installation/update from entrypoint."
+    fi
 
+    echo "Ensuring SteamCMD is installed and up-to-date..."
+    mkdir -p /home/container/steamcmd # Sicherstellen, dass das Verzeichnis existiert
     CURRENT_DIR=$(pwd)
     cd /home/container/steamcmd || { echo "ERROR: Cannot change to SteamCMD directory. Exiting."; exit 1; }
+    curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" | tar zxvf - # Sicherstellen, dass SteamCMD vorhanden ist
 
+    echo "Executing SteamCMD update/install for branch '${CURRENT_BRANCH}' (AppID: ${SRCDS_APPID})..."
     ./steamcmd.sh +force_install_dir /home/container +login "${STEAM_USER}" "${STEAM_PASS}" "${STEAM_AUTH}" +app_update "${SRCDS_APPID}" ${BRANCH_FLAG} validate +quit
 
     if [ $? -ne 0 ]; then
-        echo "ERROR: SteamCMD update failed! Check logs for details."
+        echo "ERROR: SteamCMD update failed during forced re-installation! Exiting."
         cd "${CURRENT_DIR}"
         exit 1
     fi
-    echo "Rust server files updated successfully."
+    echo "SteamCMD forced update/install completed successfully."
     cd "${CURRENT_DIR}"
-else
-    echo "Not updating game server as AUTO_UPDATE was set to 0. Starting Server."
+
+    # Wichtig: Kopiere die SteamSDK-Dateien an den richtigen Ort NACH der Installation.
+    echo "Copying SteamSDK files..."
+    mkdir -p /home/container/.steam/sdk32
+    cp -v /home/container/steamcmd/linux32/steamclient.so /home/container/.steam/sdk32/steamclient.so
+    mkdir -p /home/container/.steam/sdk64
+    cp -v /home/container/steamcmd/linux64/steamclient.so /home/container/.steam/sdk64/steamclient.so
+    echo "SteamSDK files copied."
+
+    # Schreibe die aktuelle Branch in die Datei, NACHDEM die Installation abgeschlossen ist.
+    # Dies verhindert einen weiteren Re-Install-Loop beim nächsten Start.
+    echo "${CURRENT_BRANCH}" > "${INSTALLED_BRANCH_FILE}"
+
+else # Wenn kein Branch-Wechsel ODER fehlendes SteamCMD erkannt wurde, fahren wir normal fort (optionales Update).
+    echo "No branch change detected or SteamCMD already present. Proceeding with normal server startup."
+    # Auto-update logic (Dieser Block wird weiterhin für normale Updates verwendet, wenn AUTO_UPDATE = 1)
+    if [ -z "${AUTO_UPDATE}" ] || [ "${AUTO_UPDATE}" == "1" ]; then
+        echo "Performing standard Rust server file update for branch '${CURRENT_BRANCH}' (AppID: ${SRCDS_APPID})..."
+
+        CURRENT_DIR=$(pwd)
+        cd /home/container/steamcmd || { echo "ERROR: Cannot change to SteamCMD directory. Exiting."; exit 1; }
+
+        ./steamcmd.sh +force_install_dir /home/container +login "${STEAM_USER}" "${STEAM_PASS}" "${STEAM_AUTH}" +app_update "${SRCDS_APPID}" ${BRANCH_FLAG} validate +quit
+
+        if [ $? -ne 0 ]; then
+            echo "ERROR: SteamCMD update failed! Check logs for details."
+            cd "${CURRENT_DIR}"
+            exit 1
+        fi
+        echo "Rust server files updated successfully."
+        cd "${CURRENT_DIR}"
+    else
+        echo "Not updating game server as AUTO_UPDATE was set to 0. Starting Server."
+    fi
 fi
 
 # Permissions anpassen
@@ -107,7 +134,7 @@ export LD_LIBRARY_PATH="/home/container/.steam/sdk64:$(pwd)/RustDedicated_Data/P
 # Ensure RustDedicated is executable.
 chmod +x ./RustDedicated || { echo "ERROR: Could not make RustDedicated executable. Exiting."; exit 1; }
 
-# --- NEW: Manual variable substitution for the startup command ---
+# --- Manual variable substitution for the startup command ---
 # This converts Pterodactyl-style {{VAR}} to shell-style ${VAR} and substitutes.
 # We also handle the double-quoting issue for RCON_PASS and HOSTNAME
 # by removing redundant quotes from the template.
@@ -116,6 +143,12 @@ chmod +x ./RustDedicated || { echo "ERROR: Could not make RustDedicated executab
 CLEAN_STARTUP="${STARTUP}"
 CLEAN_STARTUP="${CLEAN_STARTUP//\"{{RCON_PASS}}\"/{{RCON_PASS}}}" # Remove literal \" and \"
 CLEAN_STARTUP="${CLEAN_STARTUP//\"{{HOSTNAME}}\"/{{HOSTNAME}}}" # Remove literal \" and \"
+CLEAN_STARTUP="${CLEAN_STARTUP//\"{{DESCRIPTION}}\"/{{DESCRIPTION}}}" # Remove literal \" and \"
+# Add other variables if they also use escaped quotes
+CLEAN_STARTUP="${CLEAN_STARTUP//\"{{LEVEL}}\"/{{LEVEL}}}" # Added for consistency
+CLEAN_STARTUP="${CLEAN_STARTUP//\"{{SERVER_IMG}}\"/{{SERVER_IMG}}}" # Added for consistency
+CLEAN_STARTUP="${CLEAN_STARTUP//\"{{SERVER_LOGO}}\"/{{SERVER_LOGO}}}" # Added for consistency
+
 
 # Now, perform the substitution to shell variables.
 # This replaces {{VAR}} with the actual value of $VAR.
@@ -126,13 +159,13 @@ FINAL_STARTUP=$(echo "${CLEAN_STARTUP}" \
     -e "s|{{RCON_PASS}}|\"${RCON_PASS}\"|g" \
     -e "s|{{HOSTNAME}}|\"${HOSTNAME}\"|g" \
     -e "s|{{LEVEL}}|\"${LEVEL}\"|g" \
+    -e "s|s|{{SERVER_IMG}}|\"${SERVER_IMG}\"|g" \
+    -e "s|{{SERVER_LOGO}}|\"${SERVER_LOGO}\"|g" \
     -e "s|{{WORLD_SEED}}|${WORLD_SEED}|g" \
     -e "s|{{WORLD_SIZE}}|${WORLD_SIZE}|g" \
     -e "s|{{MAX_PLAYERS}}|${MAX_PLAYERS}|g" \
     -e "s|{{DESCRIPTION}}|\"${DESCRIPTION}\"|g" \
     -e "s|{{SERVER_URL}}|${SERVER_URL}|g" \
-    -e "s|{{SERVER_IMG}}|${SERVER_IMG}|g" \
-    -e "s|{{SERVER_LOGO}}|${SERVER_LOGO}|g" \
     -e "s|{{SAVEINTERVAL}}|${SAVEINTERVAL}|g" \
     -e "s|{{APP_PORT}}|${APP_PORT}|g" \
     -e "s|{{ADDITIONAL_ARGS}}|${ADDITIONAL_ARGS}|g" \
