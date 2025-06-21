@@ -149,41 +149,9 @@ export LD_LIBRARY_PATH="/home/container/.steam/sdk64:$(pwd)/RustDedicated_Data/P
 chmod +x ./RustDedicated || { echo "ERROR: Could not make RustDedicated executable. Exiting."; exit 1; }
 
 # --- Manual variable substitution for the startup command ---
-# This converts Pterodactyl-style {{VAR}} to shell-style ${VAR} and substitutes.
-# We also handle the double-quoting issue for RCON_PASS and HOSTNAME
-# by removing redundant quotes from the template.
-
-# Remove the extra quotes from RCON_PASS and HOSTNAME in the STARTUP string for correct parsing
-CLEAN_STARTUP="${STARTUP}"
-CLEAN_STARTUP="${CLEAN_STARTUP//\"{{RCON_PASS}}\"/{{RCON_PASS}}}" # Remove literal \" and \"
-CLEAN_STARTUP="${CLEAN_STARTUP//\"{{HOSTNAME}}\"/{{HOSTNAME}}}" # Remove literal \" and \"
-CLEAN_STARTUP="${CLE_STARTUP//\"{{DESCRIPTION}}\"/{{DESCRIPTION}}}" # Remove literal \" and \"
-# Add other variables if they also use escaped quotes
-CLEAN_STARTUP="${CLEAN_STARTUP//\"{{LEVEL}}\"/{{LEVEL}}}" # Added for consistency
-CLEAN_STARTUP="${CLE_STARTUP//\"{{SERVER_IMG}}\"/{{SERVER_IMG}}}" # Added for consistency
-CLEAN_STARTUP="${CLEAN_STARTUP//\"{{SERVER_LOGO}}\"/{{SERVER_LOGO}}}" # Added for consistency
-
-
-# Now, perform the substitution to shell variables.
-# This replaces {{VAR}} with the actual value of $VAR.
-# We explicitly re-add quotes for variables that *should* have quotes around them.
-FINAL_STARTUP=$(echo "${CLEAN_STARTUP}" \
-    | sed -e "s|{{SERVER_PORT}}|${SERVER_PORT}|g" \
-    -e "s|{{RCON_PORT}}|${RCON_PORT}|g" \
-    -e "s|{{RCON_PASS}}|\"${RCON_PASS}\"|g" \
-    -e "s|{{HOSTNAME}}|\"${HOSTNAME}\"|g" \
-    -e "s|{{LEVEL}}|\"${LEVEL}\"|g" \
-    -e "s|{{SERVER_IMG}}|\"${SERVER_IMG}\"|g" \
-    -e "s|{{SERVER_LOGO}}|\"${SERVER_LOGO}\"|g" \
-    -e "s|{{WORLD_SEED}}|${WORLD_SEED}|g" \
-    -e "s|{{WORLD_SIZE}}|${WORLD_SIZE}|g" \
-    -e "s|{{MAX_PLAYERS}}|${MAX_PLAYERS}|g" \
-    -e "s|{{DESCRIPTION}}|\"${DESCRIPTION}\"|g" \
-    -e "s|{{SERVER_URL}}|${SERVER_URL}|g" \
-    -e "s|{{SAVEINTERVAL}}|${SAVEINTERVAL}|g" \
-    -e "s|{{APP_PORT}}|${APP_PORT}|g" \
-    -e "s|{{ADDITIONAL_ARGS}}|${ADDITIONAL_ARGS}|g" \
-)
+# WICHTIG: Die komplexen sed-Ersetzungen wurden entfernt, da Pterodactyl die
+# Variablen korrekt an den Startup-Befehl übergibt.
+FINAL_STARTUP="${STARTUP}"
 
 echo "Server startup command (after substitution): ${FINAL_STARTUP}"
 echo "Running server via Node.js wrapper..."
