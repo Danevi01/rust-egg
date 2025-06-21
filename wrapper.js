@@ -34,6 +34,7 @@ console.log("Starting Rust...");
 console.log(`Executing RustDedicated with: ${rustExecutablePath} ${actualRustArguments.join(' ')}`);
 
 // Ein kleines Filterobjekt, um wiederholte "Loading Prefab Bundle"-Meldungen zu unterdrücken.
+// (Beibehalten, da dies eine nützliche Funktion des Wrappers ist, die über die Pterodactyl-Standardausgabe hinausgeht)
 const seenPercentage = {};
 
 function filter(data) {
@@ -54,8 +55,8 @@ let exited = false; // Flag, um zu verfolgen, ob der Spielprozess beendet wurde.
 // Es erwartet den Programmpfad und ein Array von Argumenten.
 const gameProcess = spawn(rustExecutablePath, actualRustArguments, {
     stdio: 'inherit', // WICHTIG: Leitet die Standardausgabe (stdout) und Standardfehlerausgabe (stderr)
-                     // des Kindprozesses (RustDedicated) direkt in die des Elternprozesses (Wrapper) weiter.
-                     // Das sorgt dafür, dass du alle Logs des Rust-Servers siehst.
+                       // des Kindprozesses (RustDedicated) direkt in die des Elternprozesses (Wrapper) weiter.
+                       // Das sorgt dafür, dass du alle Logs des Rust-Servers siehst.
     cwd: '/home/container' // Wichtig: Setzt das aktuelle Arbeitsverzeichnis für RustDedicated.
                            // Das muss dort sein, wo die Rust-Serverdateien liegen.
 });
@@ -145,8 +146,8 @@ const poll = function () {
         try {
             const json = JSON.parse(data); // Versucht, die Nachricht als JSON zu parsen.
             if (json && json.Message && json.Message.length > 0) {
-                console.log(json.Message); // Gibt die RCON-Nachricht auf der Konsole aus.
-                // Schreibt die Nachricht auch in die Logdatei.
+                // console.log(json.Message); // <-- DIESE ZEILE WIRD AUSKOMMENTIERT!
+                // Schreibt die Nachricht in die Logdatei.
                 fs.appendFile("latest.log", "\n" + json.Message, (err) => {
                     if (err) console.log("Callback error in appendFile:", err);
                 });
