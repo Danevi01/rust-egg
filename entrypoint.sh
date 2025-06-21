@@ -1,97 +1,43 @@
 #!/bin/bash
-# entrypoint.sh for Rust Server with Node.js Wrapper
+cd /home/container
 
-# Rust App ID
-SRCDS_APPID=258550
+# Make internal Docker IP address available to processes.
+export INTERNAL_IP=`ip route get 1 | awk '{print $(NF-2);exit}'`
 
-# Set SteamCMD home directory.
-# This ensures SteamCMD writes its files (like SteamApps cache) correctly.
-export HOME="/home/container"
 
-# Define the full path to the SteamCMD executable.
-# It's installed by the Egg's installation script into /home/container/steamcmd.
-STEAMCMD_PATH="/home/container/steamcmd/steamcmd.sh"
-
-# Check if the SteamCMD executable exists. If not, print an error and exit.
-if [ ! -f "${STEAMCMD_PATH}" ]; then
-    echo "ERROR: SteamCMD executable not found at ${STEAMCMD_PATH}!"
-    echo "Please ensure your Pterodactyl Egg's installation script correctly installs SteamCMD."
-    exit 1
-fi
-
-# Dynamically set the SteamCMD branch flag based on the Pterodactyl 'BRANCH' environment variable.
-BRANCH_FLAG=""
-if [ -n "${BRANCH}" ] && [ "${BRANCH}" != "release" ]; then
-    echo "Selected Rust Branch: ${BRANCH}"
-    BRANCH_FLAG="-beta ${BRANCH}"
+## if auto_update is not set or to 1 update
+if [ -z ${AUTO_UPDATE} ] || [ "${AUTO_UPDATE}" == "1" ]; then
+	./steamcmd/steamcmd.sh +force_install_dir /home/container +login anonymous +app_update 258550 +quit
 else
-    echo "Selected Rust Branch: release (default)"
+    echo -e "Not updating game server as auto update was set to 0. Starting Server"
 fi
 
-# SteamCMD login details. Use 'anonymous' if STEAM_USER is not provided.
-STEAM_USER=${STEAM_USER:-anonymous}
-STEAM_PASS=${STEAM_PASS:-""}
-STEAM_AUTH=${STEAM_AUTH:-""}
+# Replace Startup Variables
+MODIFIED_STARTUP=`eval echo $(echo ${STARTUP} | sed -e 's/{{/${/g' -e 's/}}/}/g')`
+echo ":/home/container$ ${MODIFIED_STARTUP}"
 
-echo "Updating Rust server files for branch '${BRANCH}' (AppID: ${SRCDS_APPID})..."
+if [[ "${FRAMEWORK}" == "carbon" ]]; then
+    # Carbon: https://github.com/CarbonCommunity/Carbon.Core
+    echo "Updating Carbon..."
+    curl -sSL "https://github.com/CarbonCommunity/Carbon.Core/releases/download/production_build/Carbon.Linux.Release.tar.gz" | tar zx
+    echo "Done updating Carbon!"
 
-# Change the current directory to where SteamCMD's executable is located before running it.
-cd /home/container/steamcmd || { echo "ERROR: Cannot change to SteamCMD directory. Exiting."; exit 1; }
+    export DOORSTOP_ENABLED=1
+    export DOORSTOP_TARGET_ASSEMBLY="$(pwd)/carbon/managed/Carbon.Preloader.dll"
+    MODIFIED_STARTUP="LD_PRELOAD=$(pwd)/libdoorstop.so ${MODIFIED_STARTUP}"
 
-# Execute SteamCMD to update the Rust server files.
-# +force_install_dir /home/container tells SteamCMD to install the game files into the /home/container directory.
-./steamcmd.sh +force_install_dir /home/container +login "${STEAM_USER}" "${STEAM_PASS}" "${STEAM_AUTH}" +app_update "${SRCDS_APPID}" ${BRANCH_FLAG} validate +quit
-
-# Check if SteamCMD update was successful
-if [ $? -ne 0 ]; then
-    echo "ERROR: SteamCMD update failed! Check logs for details."
-    exit 1
+elif [[ "$OXIDE" == "1" ]] || [[ "${FRAMEWORK}" == "oxide" ]]; then
+    # Oxide: https://github.com/OxideMod/Oxide.Rust
+    echo "Updating uMod..."
+    curl -sSL "https://github.com/OxideMod/Oxide.Rust/releases/latest/download/Oxide.Rust-linux.zip" > umod.zip
+    unzip -o -q umod.zip
+    rm umod.zip
+    echo "Done updating uMod!"
+# else Vanilla, do nothing
 fi
 
-echo "Rust server files updated successfully."
+# Fix for Rust not starting
+export LD_LIBRARY_PATH=$(pwd)/RustDedicated_Data/Plugins/x86_64:$(pwd)
 
-# Berechtigungen: Sicherstellen, dass der 'container' Benutzer Schreibrechte im Verzeichnis hat.
-# Dies ist notwendig, da SteamCMD die Dateien als 'root' herunterlädt,
-# der Server aber als 'container' Benutzer laufen muss.
-echo "Setting correct file permissions for /home/container (Rust game files)..."
-chown -R container:container /home/container
-chmod -R u+rwX /home/container
-
-# Prepare the startup command for the Node.js wrapper
-MODIFIED_STARTUP="./RustDedicated -batchmode"
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.port ${SERVER_PORT}"
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.queryport ${QUERY_PORT}"
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.identity \"rust\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +rcon.port ${RCON_PORT}"
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +rcon.web true"
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.hostname \"${HOSTNAME}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.level \"${LEVEL}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.description \"${DESCRIPTION}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.url \"${SERVER_URL}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.headerimage \"${SERVER_IMG}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.logoimage \"${SERVER_LOGO}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.maxplayers ${MAX_PLAYERS}"
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +rcon.password \"${RCON_PASS}\""
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.saveinterval ${SAVEINTERVAL}"
-MODIFIED_STARTUP="${MODIFIED_STARTUP} +app.port ${APP_PORT}"
-
-# Conditional logic for map URL or world size/seed.
-if [ -z "${MAP_URL}" ]; then
-    MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.worldsize \"${WORLD_SIZE}\" +server.seed \"${WORLD_SEED}\""
-else
-    MODIFIED_STARTUP="${MODIFIED_STARTUP} +server.levelurl ${MAP_URL}"
-fi
-
-# Append any additional arguments provided by the user.
-if [ -n "${ADDITIONAL_ARGS}" ]; then
-    MODIFIED_STARTUP="${MODIFIED_STARTUP} ${ADDITIONAL_ARGS}"
-fi
-
-# Change the current directory to /home/container.
-# The RustDedicated executable should be in this directory.
-cd /home/container || { echo "ERROR: Cannot change to server game directory. Exiting."; exit 1; }
-
-echo "Starting server via Node.js wrapper: node /wrapper.js \"${MODIFIED_STARTUP}\""
-
-# Execute the Node.js wrapper with the generated startup command.
-exec node /wrapper.js "${MODIFIED_STARTUP}"
+# Run the Server
+node /wrapper.js "${MODIFIED_STARTUP}"
