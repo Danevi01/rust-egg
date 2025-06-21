@@ -1,65 +1,65 @@
 #!/usr/bin/env node
 
 const fs = require("fs");
-const { spawn } = require("child_process"); // <-- Wichtig: spawn importieren
+const { spawn } = require("child_process");
 
 // Leere die Logdatei beim Start
 fs.writeFile("latest.log", "", (err) => {
     if (err) console.log("Callback error in appendFile:" + err);
 });
 
-// Die Argumente, die an den Node.js-Skript übergeben wurden
-// process.argv[0] ist 'node', process.argv[1] ist '/wrapper.js'
-// process.argv[2] wäre das erste Argument für RustDedicated, z.B. './RustDedicated'
-// process.argv.slice(2) gibt uns genau die Argumente für das Child-Programm
-const argsForRust = process.argv.slice(2);
+// `process.argv` enthält: ['/path/to/node', '/wrapper.js', './RustDedicated', '-batchmode', ...]
+// Wir brauchen ab './RustDedicated'
+const argsFromPterodactyl = process.argv.slice(2); // ['./RustDedicated', '-batchmode', ...]
 
-if (argsForRust.length < 1) {
-    console.log("Error: No startup command or arguments provided.");
-    process.exit(1); // Exit with error code
+if (argsFromPterodactyl.length < 1) {
+    console.log("Error: No startup command or arguments provided to the wrapper.");
+    process.exit(1);
 }
 
-// Den Befehl und die Argumente trennen
-const commandToExecute = argsForRust[0]; // Sollte './RustDedicated' sein
-const actualArgsForCommand = argsForRust.slice(1); // Alle Parameter NACH './RustDedicated'
+// Der erste Eintrag im Array ist der Pfad zum RustDedicated-Executable
+const rustExecutablePath = argsFromPterodactyl[0]; // Das sollte './RustDedicated' sein
+
+// Alle restlichen Einträge sind die Argumente für RustDedicated
+const rustArguments = argsFromPterodactyl.slice(1); // ['-batchmode', '-nographics', ...]
 
 console.log("Starting Rust...");
-console.log(`Executing: ${commandToExecute} ${actualArgsForCommand.join(' ')}`); // Für Debugging
+console.log(`Attempting to execute: ${rustExecutablePath} ${rustArguments.join(' ')}`); // Für Debugging
 
 const seenPercentage = {};
 
 function filter(data) {
     const str = data.toString();
-    if (str.startsWith("Loading Prefab Bundle ")) { // Rust seems to spam the same percentage, so filter out any duplicates.
+    if (str.startsWith("Loading Prefab Bundle ")) {
         const percentage = str.substr("Loading Prefab Bundle ".length);
         if (seenPercentage[percentage]) return;
 
         seenPercentage[percentage] = true;
     }
-
     console.log(str);
 }
 
-var exited = false;
-// WICHTIG: spawn() anstelle von exec() verwenden
-const gameProcess = spawn(commandToExecute, actualArgsForCommand, {
-    stdio: 'inherit', // Standardausgabe des Child-Prozesses direkt in die des Wrappers leiten
-    cwd: '/home/container' // Sicherstellen, dass das Programm im richtigen Verzeichnis gestartet wird
+let exited = false;
+// WICHTIG: spawn() mit dem direkten Executable-Pfad und den Argumenten aufrufen
+const gameProcess = spawn(rustExecutablePath, rustArguments, {
+    stdio: 'inherit',
+    cwd: '/home/container' // Wichtig: Pfad auf das Server-Verzeichnis setzen
 });
 
 gameProcess.on('error', (err) => {
-    console.error('Failed to start RustDedicated process:', err);
+    console.error(`Failed to start RustDedicated process: ${err.message}`);
+    console.error(err); // Den vollständigen Fehler-Stack ausgeben
     process.exit(1);
 });
 
 gameProcess.on('close', function (code, signal) {
     exited = true;
-    if (code !== null) { // code can be null if process was killed by signal
+    if (code !== null) {
         console.log(`Main game process exited with code ${code}`);
     } else if (signal) {
         console.log(`Main game process exited due to signal ${signal}`);
     }
-    process.exit(code || 0); // Exit with game's exit code, or 0 if by signal
+    process.exit(code || 0);
 });
 
 function initialListener(data) {
@@ -81,8 +81,8 @@ process.on('exit', function (code) {
     gameProcess.kill('SIGTERM');
 });
 
-var waiting = true;
-var poll = function () {
+let waiting = true;
+const poll = function () {
     function createPacket(command) {
         var packet = {
             Identifier: -1,
@@ -92,35 +92,22 @@ var poll = function () {
         return JSON.stringify(packet);
     }
 
-    var serverHostname = process.env.RCON_IP ? process.env.RCON_IP : "localhost";
-    var serverPort = process.env.RCON_PORT;
-    var serverPassword = process.env.RCON_PASS;
-    var WebSocket = require("ws");
+    const serverHostname = process.env.RCON_IP || "localhost";
+    const serverPort = process.env.RCON_PORT;
+    const serverPassword = process.env.RCON_PASS;
 
-    // Sicherstellen, dass WebSocket nur einmal importiert wird, um Fehler zu vermeiden
-    if (typeof WebSocket === 'undefined') {
-         // Dies sollte nicht passieren, wenn 'ws' im Dockerfile installiert ist.
-         // Kann aber bei lokalen Tests ohne 'npm install ws' auftreten.
-        console.error("WebSocket module not found. Please ensure 'ws' is installed in your Docker image.");
-        setTimeout(poll, 5000); // Erneuter Versuch
-        return;
-    }
+    // 'ws' Modul sollte im Dockerfile installiert sein.
+    const WebSocket = require("ws");
 
-
-    var ws = new WebSocket("ws://" + serverHostname + ":" + serverPort + "/" + serverPassword);
+    const ws = new WebSocket(`ws://${serverHostname}:${serverPort}/${serverPassword}`);
 
     ws.on("open", function open() {
         console.log("Connected to RCON. Generating the map now. Please wait until the server status switches to \"Running\".");
         waiting = false;
 
-        // Hack to fix broken console output
         ws.send(createPacket('status'));
 
         process.stdin.removeListener('data', initialListener);
-        // Da wir stdio: 'inherit' verwenden, leitet spawn die Ausgabe direkt weiter.
-        // Diese Listener sind möglicherweise nicht mehr nötig oder würden die Ausgabe duplizieren.
-        //gameProcess.stdout.removeListener('data', filter);
-        //gameProcess.stderr.removeListener('data', filter);
         process.stdin.on('data', function (text) {
             ws.send(createPacket(text));
         });
@@ -128,36 +115,29 @@ var poll = function () {
 
     ws.on("message", function (data, flags) {
         try {
-            var json = JSON.parse(data);
-            if (json !== undefined) {
-                if (json.Message !== undefined && json.Message.length > 0) {
-                    console.log(json.Message);
-                    const fs = require("fs"); // fs sollte schon oben importiert sein, aber ok hier.
-                    fs.appendFile("latest.log", "\n" + json.Message, (err) => {
-                        if (err) console.log("Callback error in appendFile:" + err);
-                    });
-                }
-            } else {
-                console.log("Error: Invalid JSON received");
+            const json = JSON.parse(data);
+            if (json && json.Message && json.Message.length > 0) {
+                console.log(json.Message);
+                fs.appendFile("latest.log", "\n" + json.Message, (err) => {
+                    if (err) console.log("Callback error in appendFile:" + err);
+                });
             }
         } catch (e) {
-            if (e) {
-                console.log(e);
-            }
+            console.log("Error parsing RCON message:", e.message || e);
         }
     });
 
     ws.on("error", function (err) {
         waiting = true;
-        console.log("Waiting for RCON to come up...");
+        console.log("Waiting for RCON to come up... (Error: " + err.message + ")"); // Mehr Details
         setTimeout(poll, 5000);
     });
 
-    ws.on("close", function () {
+    ws.on("close", function (code, reason) {
         if (!waiting) {
-            console.log("Connection to server closed.");
+            console.log(`Connection to server closed. Code: ${code}, Reason: ${reason}`);
             exited = true;
-            process.exit(0); // Exit normally if RCON connection closes gracefully
+            process.exit(0);
         }
     });
 }
