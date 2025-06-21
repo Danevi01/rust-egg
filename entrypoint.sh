@@ -149,9 +149,28 @@ export LD_LIBRARY_PATH="/home/container/.steam/sdk64:$(pwd)/RustDedicated_Data/P
 chmod +x ./RustDedicated || { echo "ERROR: Could not make RustDedicated executable. Exiting."; exit 1; }
 
 # --- Manual variable substitution for the startup command ---
-# WICHTIG: Die komplexen sed-Ersetzungen wurden entfernt, da Pterodactyl die
-# Variablen korrekt an den Startup-Befehl übergibt.
-FINAL_STARTUP="${STARTUP}"
+# Diese Logik ersetzt die Pterodactyl-Platzhalter durch ihre tatsächlichen Werte.
+# Variablen wie HOSTNAME und DESCRIPTION, die Leerzeichen enthalten können,
+# werden in doppelte Anführungszeichen gesetzt, um korrekt übergeben zu werden.
+# Die Werte für {{SERVER_IMG}} und {{SERVER_LOGO}} werden von Rust selbst als 1 oder 0 interpretiert,
+# wenn sie nicht als URLs vorliegen, daher behandeln wir sie hier als Strings.
+FINAL_STARTUP=$(echo "${STARTUP}" \
+    | sed -e "s|{{SERVER_PORT}}|${SERVER_PORT}|g" \
+    -e "s|{{RCON_PORT}}|${RCON_PORT}|g" \
+    -e "s|{{RCON_PASS}}|\"${RCON_PASS}\"|g" \
+    -e "s|{{HOSTNAME}}|\"${HOSTNAME}\"|g" \
+    -e "s|{{LEVEL}}|\"${LEVEL}\"|g" \
+    -e "s|{{WORLD_SEED}}|${WORLD_SEED}|g" \
+    -e "s|{{WORLD_SIZE}}|${WORLD_SIZE}|g" \
+    -e "s|{{MAX_PLAYERS}}|${MAX_PLAYERS}|g" \
+    -e "s|{{DESCRIPTION}}|\"${DESCRIPTION}\"|g" \
+    -e "s|{{SERVER_URL}}|${SERVER_URL}|g" \
+    -e "s|{{SERVER_IMG}}|${SERVER_IMG}|g" \
+    -e "s|{{SERVER_LOGO}}|${SERVER_LOGO}|g" \
+    -e "s|{{SAVEINTERVAL}}|${SAVEINTERVAL}|g" \
+    -e "s|{{APP_PORT}}|${APP_PORT}|g" \
+    -e "s|{{ADDITIONAL_ARGS}}|${ADDITIONAL_ARGS}|g" \
+)
 
 echo "Server startup command (after substitution): ${FINAL_STARTUP}"
 echo "Running server via Node.js wrapper..."
